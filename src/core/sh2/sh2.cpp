@@ -1,4 +1,5 @@
 #include <cassert>
+#include <common/bswp.h>
 #include "core/sh2/sh2.h"
 #include "core/sh2/sh2_bus.h"
 #include "core/sh2/sh2_interpreter.h"
@@ -9,20 +10,6 @@ namespace SH2
 {
 
 CPU sh2;
-
-//TODO: move these functions to a common module
-static uint16_t bswp16(uint16_t value)
-{
-	return (value >> 8) | (value << 8);
-}
-
-uint32_t bswp32(uint32_t value)
-{
-	return (value >> 24) |
-		(((value >> 16) & 0xFF) << 8) |
-		(((value >> 8) & 0xFF) << 16) |
-		(value << 24);
-}
 
 static uint32_t translate_addr(uint32_t addr)
 {
@@ -82,7 +69,7 @@ uint16_t read16(uint32_t addr)
 
 	uint16_t value;
 	memcpy(&value, mem + (addr & 0xFFF), 2);
-	return bswp16(value);
+	return Common::bswp16(value);
 }
 
 uint32_t read32(uint32_t addr)
@@ -96,7 +83,7 @@ uint32_t read32(uint32_t addr)
 
 	uint32_t value;
 	memcpy(&value, mem + (addr & 0xFFF), 4);
-	return bswp32(value);
+	return Common::bswp32(value);
 }
 
 void write8(uint32_t addr, uint8_t value)
@@ -122,7 +109,7 @@ void write16(uint32_t addr, uint16_t value)
 		return;
 	}
 
-	value = bswp16(value);
+	value = Common::bswp16(value);
 	memcpy(mem + (addr & 0xFFF), &value, 2);
 }
 
@@ -136,7 +123,7 @@ void write32(uint32_t addr, uint32_t value)
 		return;
 	}
 
-	value = bswp32(value);
+	value = Common::bswp32(value);
 	memcpy(mem + (addr & 0xFFF), &value, 4);
 }
 

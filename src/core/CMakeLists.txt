@@ -12,3 +12,5 @@ add_library (core STATIC
 			 "sh2/sh2_interpreter.cpp"
 			 "sh2/sh2_interpreter.h"
 			 "sh2/sh2_local.h")
+
+target_link_libraries(core PRIVATE common)
