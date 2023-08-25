@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdio>
+#include "core/sh2/sh2_bus.h"
 #include "core/sh2/sh2_interpreter.h"
 #include "core/sh2/sh2_local.h"
 
@@ -22,7 +23,7 @@ static void handle_jump(uint32_t dst, bool delay_slot)
 	{
 		sh2.pc += 2;
 
-		uint16_t instr = read16(sh2.pc - 4);
+		uint16_t instr = Bus::read16(sh2.pc - 4);
 		run(instr);
 	}
 	
@@ -112,7 +113,7 @@ static void movw_pcrel_reg(uint16_t instr)
 	uint32_t offs = (instr & 0xFF) << 1;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = (int32_t)(int16_t)read16(sh2.pc + offs);
+	sh2.gpr[reg] = (int32_t)(int16_t)Bus::read16(sh2.pc + offs);
 }
 
 static void movl_pcrel_reg(uint16_t instr)
@@ -120,7 +121,7 @@ static void movl_pcrel_reg(uint16_t instr)
 	uint32_t offs = (instr & 0xFF) << 2;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = read32((sh2.pc & ~0x3) + offs);
+	sh2.gpr[reg] = Bus::read32((sh2.pc & ~0x3) + offs);
 }
 
 static void mov_reg_reg(uint16_t instr)
@@ -136,7 +137,7 @@ static void movb_reg_mem(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
-	write8(sh2.gpr[mem], sh2.gpr[reg]);
+	Bus::write8(sh2.gpr[mem], sh2.gpr[reg]);
 }
 
 static void movw_reg_mem(uint16_t instr)
@@ -144,7 +145,7 @@ static void movw_reg_mem(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
-	write16(sh2.gpr[mem], sh2.gpr[reg]);
+	Bus::write16(sh2.gpr[mem], sh2.gpr[reg]);
 }
 
 static void movl_reg_mem(uint16_t instr)
@@ -152,7 +153,7 @@ static void movl_reg_mem(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
-	write32(sh2.gpr[mem], sh2.gpr[reg]);
+	Bus::write32(sh2.gpr[mem], sh2.gpr[reg]);
 }
 
 static void movb_mem_reg(uint16_t instr)
@@ -160,7 +161,7 @@ static void movb_mem_reg(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = (int32_t)(int8_t)read8(sh2.gpr[mem]);
+	sh2.gpr[reg] = (int32_t)(int8_t)Bus::read8(sh2.gpr[mem]);
 }
 
 static void movw_mem_reg(uint16_t instr)
@@ -168,7 +169,7 @@ static void movw_mem_reg(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = (int32_t)(int16_t)read16(sh2.gpr[mem]);
+	sh2.gpr[reg] = (int32_t)(int16_t)Bus::read16(sh2.gpr[mem]);
 }
 
 static void movl_mem_reg(uint16_t instr)
@@ -176,7 +177,7 @@ static void movl_mem_reg(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = read32(sh2.gpr[mem]);
+	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem]);
 }
 
 static void movl_reg_mem_dec(uint16_t instr)
@@ -185,7 +186,7 @@ static void movl_reg_mem_dec(uint16_t instr)
 	uint32_t mem = (instr >> 8) & 0xF;
 
 	sh2.gpr[mem] -= 4;
-	write32(sh2.gpr[mem], sh2.gpr[reg]);
+	Bus::write32(sh2.gpr[mem], sh2.gpr[reg]);
 }
 
 static void movb_mem_reg_inc(uint16_t instr)
@@ -193,7 +194,7 @@ static void movb_mem_reg_inc(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = (int32_t)(int8_t)read8(sh2.gpr[mem]);
+	sh2.gpr[reg] = (int32_t)(int8_t)Bus::read8(sh2.gpr[mem]);
 	sh2.gpr[mem]++;
 }
 
@@ -202,7 +203,7 @@ static void movw_mem_reg_inc(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = (int32_t)(int16_t)read16(sh2.gpr[mem]);
+	sh2.gpr[reg] = (int32_t)(int16_t)Bus::read16(sh2.gpr[mem]);
 	sh2.gpr[mem] += 2;
 }
 
@@ -211,7 +212,7 @@ static void movl_mem_reg_inc(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = read32(sh2.gpr[mem]);
+	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem]);
 	sh2.gpr[mem] += 4;
 }
 
@@ -220,7 +221,7 @@ static void movw_reg_memrel(uint16_t instr)
 	uint32_t offs = (instr & 0xF) << 1;
 	uint32_t mem = (instr >> 4) & 0xF;
 
-	write16(sh2.gpr[mem] + offs, sh2.gpr[0]);
+	Bus::write16(sh2.gpr[mem] + offs, sh2.gpr[0]);
 }
 
 static void movl_reg_memrel(uint16_t instr)
@@ -229,7 +230,7 @@ static void movl_reg_memrel(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
-	write32(sh2.gpr[mem] + offs, sh2.gpr[reg]);
+	Bus::write32(sh2.gpr[mem] + offs, sh2.gpr[reg]);
 }
 
 static void movw_memrel_reg(uint16_t instr)
@@ -237,7 +238,7 @@ static void movw_memrel_reg(uint16_t instr)
 	uint32_t offs = (instr & 0xF) << 1;
 	uint32_t mem = (instr >> 4) & 0xF;
 
-	sh2.gpr[0] = (int32_t)(int16_t)read16(sh2.gpr[mem] + offs);
+	sh2.gpr[0] = (int32_t)(int16_t)Bus::read16(sh2.gpr[mem] + offs);
 }
 
 static void movl_memrel_reg(uint16_t instr)
@@ -246,7 +247,7 @@ static void movl_memrel_reg(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = read32(sh2.gpr[mem] + offs);
+	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem] + offs);
 }
 
 static void movl_reg_memrelr0(uint16_t instr)
@@ -254,7 +255,7 @@ static void movl_reg_memrelr0(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
-	write32(sh2.gpr[mem] + sh2.gpr[0], sh2.gpr[reg]);
+	Bus::write32(sh2.gpr[mem] + sh2.gpr[0], sh2.gpr[reg]);
 }
 
 static void movb_memrelr0_reg(uint16_t instr)
@@ -262,31 +263,31 @@ static void movb_memrelr0_reg(uint16_t instr)
 	uint32_t mem = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
-	sh2.gpr[reg] = (int32_t)(int8_t)read8(sh2.gpr[mem] + sh2.gpr[0]);
+	sh2.gpr[reg] = (int32_t)(int8_t)Bus::read8(sh2.gpr[mem] + sh2.gpr[0]);
 }
 
 static void movb_reg_gbrrel(uint16_t instr)
 {
 	uint32_t offs = instr & 0xFF;
-	write8(sh2.gbr + offs, sh2.gpr[0]);
+	Bus::write8(sh2.gbr + offs, sh2.gpr[0]);
 }
 
 static void movw_reg_gbrrel(uint16_t instr)
 {
 	uint32_t offs = (instr & 0xFF) << 1;
-	write16(sh2.gbr + offs, sh2.gpr[0]);
+	Bus::write16(sh2.gbr + offs, sh2.gpr[0]);
 }
 
 static void movb_gbrrel_reg(uint16_t instr)
 {
 	uint32_t offs = instr & 0xFF;
-	sh2.gpr[0] = (int32_t)(int8_t)read8(sh2.gbr + offs);
+	sh2.gpr[0] = (int32_t)(int8_t)Bus::read8(sh2.gbr + offs);
 }
 
 static void movw_gbrrel_reg(uint16_t instr)
 {
 	uint32_t offs = (instr & 0xFF) << 1;
-	sh2.gpr[0] = (int32_t)(int16_t)read16(sh2.gbr + offs);
+	sh2.gpr[0] = (int32_t)(int16_t)Bus::read16(sh2.gbr + offs);
 }
 
 static void mova(uint16_t instr)
@@ -675,7 +676,7 @@ static void ldcl_mem_inc(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
-	uint32_t value = read32(sh2.gpr[mem]);
+	uint32_t value = Bus::read32(sh2.gpr[mem]);
 	set_control_reg(reg, value);
 	sh2.gpr[mem] += 4;
 }
@@ -685,7 +686,7 @@ static void ldsl_mem_inc(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
-	uint32_t value = read32(sh2.gpr[mem]);
+	uint32_t value = Bus::read32(sh2.gpr[mem]);
 	set_system_reg(reg, value);
 	sh2.gpr[mem] += 4;
 }
@@ -717,7 +718,7 @@ static void stsl_mem_dec(uint16_t instr)
 	uint32_t mem = (instr >> 8) & 0xF;
 
 	sh2.gpr[mem] -= 4;
-	write32(sh2.gpr[mem], get_system_reg(reg));
+	Bus::write32(sh2.gpr[mem], get_system_reg(reg));
 }
 
 void run(uint16_t instr)
