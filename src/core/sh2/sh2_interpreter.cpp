@@ -155,6 +155,14 @@ static void movl_reg_mem(uint16_t instr)
 	write32(sh2.gpr[mem], sh2.gpr[reg]);
 }
 
+static void movb_mem_reg(uint16_t instr)
+{
+	uint32_t mem = (instr >> 4) & 0xF;
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	sh2.gpr[reg] = (int32_t)(int8_t)read8(sh2.gpr[mem]);
+}
+
 static void movw_mem_reg(uint16_t instr)
 {
 	uint32_t mem = (instr >> 4) & 0xF;
@@ -178,6 +186,15 @@ static void movl_reg_mem_dec(uint16_t instr)
 
 	sh2.gpr[mem] -= 4;
 	write32(sh2.gpr[mem], sh2.gpr[reg]);
+}
+
+static void movb_mem_reg_inc(uint16_t instr)
+{
+	uint32_t mem = (instr >> 4) & 0xF;
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	sh2.gpr[reg] = (int32_t)(int8_t)read8(sh2.gpr[mem]);
+	sh2.gpr[mem]++;
 }
 
 static void movw_mem_reg_inc(uint16_t instr)
@@ -232,6 +249,22 @@ static void movl_memrel_reg(uint16_t instr)
 	sh2.gpr[reg] = read32(sh2.gpr[mem] + offs);
 }
 
+static void movl_reg_memrelr0(uint16_t instr)
+{
+	uint32_t reg = (instr >> 4) & 0xF;
+	uint32_t mem = (instr >> 8) & 0xF;
+
+	write32(sh2.gpr[mem] + sh2.gpr[0], sh2.gpr[reg]);
+}
+
+static void movb_memrelr0_reg(uint16_t instr)
+{
+	uint32_t mem = (instr >> 4) & 0xF;
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	sh2.gpr[reg] = (int32_t)(int8_t)read8(sh2.gpr[mem] + sh2.gpr[0]);
+}
+
 static void movb_reg_gbrrel(uint16_t instr)
 {
 	uint32_t offs = instr & 0xFF;
@@ -260,6 +293,32 @@ static void mova(uint16_t instr)
 {
 	uint32_t offs = (instr & 0xFF) << 2;
 	sh2.gpr[0] = offs + (sh2.pc & ~0x3);
+}
+
+static void movt(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	sh2.gpr[reg] = GET_T();
+}
+
+static void swapw(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	uint32_t value = sh2.gpr[src];
+	sh2.gpr[dst] = (value >> 16) | (value << 16);
+}
+
+static void xtrct(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	uint32_t value1 = sh2.gpr[src] << 16;
+	uint32_t value2 = sh2.gpr[dst] >> 16;
+	sh2.gpr[dst] = value1 | value2;
 }
 
 //Arithmetic instructions
@@ -315,12 +374,45 @@ static void cmpge(uint16_t instr)
 	SET_T(result);
 }
 
+static void cmpgt(uint16_t instr)
+{
+	uint32_t reg1 = (instr >> 4) & 0xF;
+	uint32_t reg2 = (instr >> 8) & 0xF;
+
+	bool result = (int32_t)sh2.gpr[reg2] > (int32_t)sh2.gpr[reg1];
+	SET_T(result);
+}
+
 static void cmppl(uint16_t instr)
 {
 	uint32_t reg = (instr >> 8) & 0xF;
 
 	bool result = (int32_t)sh2.gpr[reg] > 0;
 	SET_T(result);
+}
+
+static void cmppz(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	bool result = (int32_t)sh2.gpr[reg] >= 0;
+	SET_T(result);
+}
+
+static void extsb(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	sh2.gpr[dst] = (int32_t)(int8_t)(sh2.gpr[src] & 0xFF);
+}
+
+static void extsw(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	sh2.gpr[dst] = (int32_t)(int16_t)(sh2.gpr[src] & 0xFFFF);
 }
 
 static void extub(uint16_t instr)
@@ -337,6 +429,25 @@ static void extuw(uint16_t instr)
 	uint32_t dst = (instr >> 8) & 0xF;
 
 	sh2.gpr[dst] = sh2.gpr[src] & 0xFFFF;
+}
+
+static void muluw(uint16_t instr)
+{
+	uint32_t reg1 = (instr >> 4) & 0xF;
+	uint32_t reg2 = (instr >> 8) & 0xF;
+
+	uint32_t value1 = sh2.gpr[reg1] & 0xFFFF;
+	uint32_t value2 = sh2.gpr[reg2] & 0xFFFF;
+
+	sh2.macl = value1 * value2;
+}
+
+static void sub(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	sh2.gpr[dst] -= sh2.gpr[src];
 }
 
 //Logic instructions
@@ -390,6 +501,56 @@ static void tst_imm(uint16_t instr)
 
 //Shift instructions
 
+static void rotl(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	bool carry = sh2.gpr[reg] >> 31;
+	sh2.gpr[reg] <<= 1;
+	sh2.gpr[reg] |= carry;
+	SET_T(carry);
+}
+
+static void rotr(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	bool carry = sh2.gpr[reg] & 0x1;
+	sh2.gpr[reg] >>= 1;
+	sh2.gpr[reg] |= carry << 31;
+	SET_T(carry);
+}
+
+static void rotcl(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	bool old_t = GET_T();
+	bool new_t = sh2.gpr[reg] >> 31;
+	sh2.gpr[reg] <<= 1;
+	sh2.gpr[reg] |= old_t;
+	SET_T(new_t);
+}
+
+static void rotcr(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	bool old_t = GET_T();
+	bool new_t = sh2.gpr[reg] & 0x1;
+	sh2.gpr[reg] >>= 1;
+	sh2.gpr[reg] |= old_t << 31;
+	SET_T(new_t);
+}
+
+static void shar(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	SET_T(sh2.gpr[reg] & 0x1);
+	sh2.gpr[reg] = ((int32_t)sh2.gpr[reg]) >> 1;
+}
+
 static void shll(uint16_t instr)
 {
 	uint32_t reg = (instr >> 8) & 0xF;
@@ -422,6 +583,18 @@ static void shll8(uint16_t instr)
 {
 	uint32_t reg = (instr >> 8) & 0xF;
 	sh2.gpr[reg] <<= 8;
+}
+
+static void shlr8(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+	sh2.gpr[reg] >>= 8;
+}
+
+static void shll16(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+	sh2.gpr[reg] <<= 16;
 }
 
 //Control flow instructions
@@ -517,12 +690,25 @@ static void ldsl_mem_inc(uint16_t instr)
 	sh2.gpr[mem] += 4;
 }
 
+static void sett(uint16_t instr)
+{
+	SET_T(true);
+}
+
 static void stc_reg(uint16_t instr)
 {
 	uint32_t index = (instr >> 4) & 0xF;
 	uint32_t reg = (instr >> 8) & 0xF;
 
 	sh2.gpr[reg] = get_control_reg(index);
+}
+
+static void sts_reg(uint16_t instr)
+{
+	uint32_t index = (instr >> 4) & 0xF;
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	sh2.gpr[reg] = get_system_reg(index);
 }
 
 static void stsl_mem_dec(uint16_t instr)
@@ -565,6 +751,10 @@ void run(uint16_t instr)
 	{
 		movl_reg_mem(instr);
 	}
+	else if ((instr & 0xF00F) == 0x6000)
+	{
+		movb_mem_reg(instr);
+	}
 	else if ((instr & 0xF00F) == 0x6001)
 	{
 		movw_mem_reg(instr);
@@ -576,6 +766,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x2006)
 	{
 		movl_reg_mem_dec(instr);
+	}
+	else if ((instr & 0xF00F) == 0x6004)
+	{
+		movb_mem_reg_inc(instr);
 	}
 	else if ((instr & 0xF00F) == 0x6005)
 	{
@@ -601,6 +795,14 @@ void run(uint16_t instr)
 	{
 		movl_memrel_reg(instr);
 	}
+	else if ((instr & 0xF00F) == 0x0006)
+	{
+		movl_reg_memrelr0(instr);
+	}
+	else if ((instr & 0xF00F) == 0x000C)
+	{
+		movb_memrelr0_reg(instr);
+	}
 	else if ((instr & 0xFF00) == 0xC000)
 	{
 		movb_reg_gbrrel(instr);
@@ -620,6 +822,18 @@ void run(uint16_t instr)
 	else if ((instr & 0xFF00) == 0xC700)
 	{
 		mova(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x0029)
+	{
+		movt(instr);
+	}
+	else if ((instr & 0xF00F) == 0x6009)
+	{
+		swapw(instr);
+	}
+	else if ((instr & 0xF00F) == 0x200D)
+	{
+		xtrct(instr);
 	}
 	else if ((instr & 0xF00F) == 0x300C)
 	{
@@ -645,9 +859,25 @@ void run(uint16_t instr)
 	{
 		cmpge(instr);
 	}
+	else if ((instr & 0xF00F) == 0x3007)
+	{
+		cmpgt(instr);
+	}
 	else if ((instr & 0xF0FF) == 0x4015)
 	{
 		cmppl(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4011)
+	{
+		cmppz(instr);
+	}
+	else if ((instr & 0xF00F) == 0x600E)
+	{
+		extsb(instr);
+	}
+	else if ((instr & 0xF00F) == 0x600F)
+	{
+		extsw(instr);
 	}
 	else if ((instr & 0xF00F) == 0x600C)
 	{
@@ -656,6 +886,14 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x600D)
 	{
 		extuw(instr);
+	}
+	else if ((instr & 0xF00F) == 0x200E)
+	{
+		muluw(instr);
+	}
+	else if ((instr & 0xF00F) == 0x3008)
+	{
+		sub(instr);
 	}
 	else if ((instr & 0xF00F) == 0x2009)
 	{
@@ -681,6 +919,26 @@ void run(uint16_t instr)
 	{
 		tst_imm(instr);
 	}
+	else if ((instr & 0xF0FF) == 0x4004)
+	{
+		rotl(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4005)
+	{
+		rotr(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4024)
+	{
+		rotcl(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4025)
+	{
+		rotcr(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4021)
+	{
+		shar(instr);
+	}
 	else if ((instr & 0xF0FF) == 0x4000)
 	{
 		shll(instr);
@@ -700,6 +958,14 @@ void run(uint16_t instr)
 	else if ((instr & 0xF0FF) == 0x4018)
 	{
 		shll8(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4019)
+	{
+		shlr8(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4028)
+	{
+		shll16(instr);
 	}
 	else if ((instr & 0xFF00) == 0x8B00)
 	{
@@ -745,9 +1011,17 @@ void run(uint16_t instr)
 	{
 		//nop
 	}
+	else if (instr == 0x0018)
+	{
+		sett(instr);
+	}
 	else if ((instr & 0xF00F) == 0x0002)
 	{
 		stc_reg(instr);
+	}
+	else if ((instr & 0xF00F) == 0x000A)
+	{
+		sts_reg(instr);
 	}
 	else if ((instr & 0xF00F) == 0x4002)
 	{
