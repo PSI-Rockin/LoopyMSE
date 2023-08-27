@@ -192,6 +192,17 @@ static void movl_mem_reg(uint16_t instr)
 	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem]);
 }
 
+static void movw_reg_mem_dec(uint16_t instr)
+{
+	uint32_t reg = (instr >> 4) & 0xF;
+	uint32_t mem = (instr >> 8) & 0xF;
+
+	//Edge case: if reg and mem are the same, the original value must be written to memory
+	uint16_t value = sh2.gpr[reg];
+	sh2.gpr[mem] -= 4;
+	Bus::write16(sh2.gpr[mem], value);
+}
+
 static void movl_reg_mem_dec(uint16_t instr)
 {
 	uint32_t reg = (instr >> 4) & 0xF;
@@ -589,6 +600,17 @@ static void extuw(uint16_t instr)
 	sh2.gpr[dst] = sh2.gpr[src] & 0xFFFF;
 }
 
+static void mulsw(uint16_t instr)
+{
+	uint32_t reg1 = (instr >> 4) & 0xF;
+	uint32_t reg2 = (instr >> 8) & 0xF;
+
+	int32_t value1 = (int32_t)(int16_t)(sh2.gpr[reg1] & 0xFFFF);
+	int32_t value2 = (int32_t)(int16_t)(sh2.gpr[reg2] & 0xFFFF);
+
+	sh2.macl = value1 * value2;
+}
+
 static void muluw(uint16_t instr)
 {
 	uint32_t reg1 = (instr >> 4) & 0xF;
@@ -967,6 +989,10 @@ void run(uint16_t instr)
 	{
 		movl_mem_reg(instr);
 	}
+	else if ((instr & 0xF00F) == 0x2005)
+	{
+		movw_reg_mem_dec(instr);
+	}
 	else if ((instr & 0xF00F) == 0x2006)
 	{
 		movl_reg_mem_dec(instr);
@@ -1138,6 +1164,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x600D)
 	{
 		extuw(instr);
+	}
+	else if ((instr & 0xF00F) == 0x200F)
+	{
+		mulsw(instr);
 	}
 	else if ((instr & 0xF00F) == 0x200E)
 	{
