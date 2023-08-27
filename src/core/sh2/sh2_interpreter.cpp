@@ -280,6 +280,14 @@ static void movl_memrel_reg(uint16_t instr)
 	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem] + offs);
 }
 
+static void movb_reg_memrelr0(uint16_t instr)
+{
+	uint32_t reg = (instr >> 4) & 0xF;
+	uint32_t mem = (instr >> 8) & 0xF;
+
+	Bus::write8(sh2.gpr[mem] + sh2.gpr[0], sh2.gpr[reg]);
+}
+
 static void movw_reg_memrelr0(uint16_t instr)
 {
 	uint32_t reg = (instr >> 4) & 0xF;
@@ -406,6 +414,21 @@ static void addc(uint16_t instr)
 
 	bool new_carry = tmp > sh2.gpr[dst] || old_dst > tmp;
 	SET_T(new_carry);
+}
+
+static void addv(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	uint32_t a = sh2.gpr[src];
+	uint32_t b = sh2.gpr[dst];
+	uint32_t result = a + b;
+	sh2.gpr[dst] = result;
+	
+	//If a and b have the same sign, and a and the sum have different signs, overflow has occurred
+	bool overflow = (!((a ^ b) & 0x80000000)) && ((a ^ result) & 0x80000000);
+	SET_T(overflow);
 }
 
 static void cmpeq_imm(uint16_t instr)
@@ -984,6 +1007,10 @@ void run(uint16_t instr)
 	{
 		movl_memrel_reg(instr);
 	}
+	else if ((instr & 0xF00F) == 0x0004)
+	{
+		movb_reg_memrelr0(instr);
+	}
 	else if ((instr & 0xF00F) == 0x0005)
 	{
 		movw_reg_memrelr0(instr);
@@ -1047,6 +1074,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x300E)
 	{
 		addc(instr);
+	}
+	else if ((instr & 0xF00F) == 0x300F)
+	{
+		addv(instr);
 	}
 	else if ((instr & 0xFF00) == 0x8800)
 	{
