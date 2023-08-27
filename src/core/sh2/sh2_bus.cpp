@@ -2,16 +2,13 @@
 #include <cstring>
 #include <fstream>
 #include <common/bswp.h>
+#include <video/video.h>
 #include "core/sh2/peripherals/sh2_ocpm.h"
 #include "core/sh2/sh2_bus.h"
 #include "core/sh2/sh2_local.h"
 
 namespace SH2::Bus
 {
-
-//TODO: Get rid of this FILTHY hack
-static bool is_vblank = false;
-static std::ofstream vram_dump;
 
 static uint32_t translate_addr(uint32_t addr)
 {
@@ -25,9 +22,19 @@ static uint32_t translate_addr(uint32_t addr)
 	return addr & ~0xF0000000;
 }
 
-#define MMIO_ACCESS(access, ...)										\
-	if (addr >= OCPM::BASE_ADDR && addr <= OCPM::END_ADDR)				\
-		return OCPM::##access(__VA_ARGS__);								\
+#define MMIO_ACCESS(access, ...)											\
+	if (addr >= Video::PALETTE_START && addr < Video::PALETTE_END)			\
+		return Video::palette_##access(__VA_ARGS__);						\
+	if (addr >= Video::CAPTURE_START && addr < Video::CAPTURE_END)			\
+		return Video::capture_##access(__VA_ARGS__);						\
+	if (addr >= Video::CTRL_REG_START && addr < Video::CTRL_REG_END)		\
+		return Video::ctrl_##access(__VA_ARGS__);							\
+	if (addr >= Video::BITMAP_REG_START && addr < Video::BITMAP_REG_END)	\
+		return Video::bitmap_reg_##access(__VA_ARGS__);						\
+	if (addr >= Video::DISPLAY_REG_START && addr < Video::DISPLAY_REG_END)	\
+		return Video::display_##access(__VA_ARGS__);						\
+	if (addr >= OCPM::BASE_ADDR && addr < OCPM::END_ADDR)					\
+		return OCPM::##access(__VA_ARGS__);									\
 	return unmapped_##access(__VA_ARGS__);
 
 uint8_t unmapped_read8(uint32_t addr)
@@ -38,11 +45,6 @@ uint8_t unmapped_read8(uint32_t addr)
 
 uint16_t unmapped_read16(uint32_t addr)
 {
-	if (addr == 0x04058004)
-	{
-		is_vblank = !is_vblank;
-		return is_vblank << 8;
-	}
 	printf("[SH2] unmapped read16 %08X\n", addr);
 	return 0;
 }

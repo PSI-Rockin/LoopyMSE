@@ -18,4 +18,4 @@ add_library (core STATIC
 			 "sh2/peripherals/sh2_ocpm.cpp"
 			 "sh2/peripherals/sh2_ocpm.h")
 
-target_link_libraries(core PRIVATE common)
+target_link_libraries(core PRIVATE common video)

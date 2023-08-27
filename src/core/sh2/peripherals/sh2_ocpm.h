@@ -5,7 +5,7 @@ namespace SH2::OCPM
 {
 
 constexpr static int BASE_ADDR = 0x05000000;
-constexpr static int END_ADDR = 0x05FFFFFF;
+constexpr static int END_ADDR = 0x06000000;
 
 uint8_t read8(uint32_t addr);
 uint16_t read16(uint32_t addr);
