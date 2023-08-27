@@ -8,10 +8,22 @@ namespace SH2::Interpreter
 {
 
 #define GET_T() (sh2.sr & 0x1)
+#define GET_Q() ((sh2.sr >> 8) & 0x1)
+#define GET_M() ((sh2.sr >> 9) & 0x1)
 
-#define SET_T(x) do {    \
-	sh2.sr &= ~0x1;      \
-	sh2.sr |= (x) & 0x1; \
+#define SET_T(x) do {			\
+	sh2.sr &= ~0x1;				\
+	sh2.sr |= (x) & 0x1;		\
+} while (0);
+
+#define SET_Q(x) do {			\
+	sh2.sr &= ~0x100;			\
+	sh2.sr |= ((x) & 0x1) << 8; \
+} while (0);
+
+#define SET_M(x) do {			\
+	sh2.sr &= ~0x200;			\
+	sh2.sr |= ((x) & 0x1) << 9; \
 } while (0);
 
 static void handle_jump(uint32_t dst, bool delay_slot)
@@ -185,8 +197,10 @@ static void movl_reg_mem_dec(uint16_t instr)
 	uint32_t reg = (instr >> 4) & 0xF;
 	uint32_t mem = (instr >> 8) & 0xF;
 
+	//Edge case: if reg and mem are the same, the original value must be written to memory
+	uint32_t value = sh2.gpr[reg];
 	sh2.gpr[mem] -= 4;
-	Bus::write32(sh2.gpr[mem], sh2.gpr[reg]);
+	Bus::write32(sh2.gpr[mem], value);
 }
 
 static void movb_mem_reg_inc(uint16_t instr)
@@ -216,6 +230,14 @@ static void movl_mem_reg_inc(uint16_t instr)
 	sh2.gpr[mem] += 4;
 }
 
+static void movb_reg_memrel(uint16_t instr)
+{
+	uint32_t offs = instr & 0xF;
+	uint32_t mem = (instr >> 4) & 0xF;
+
+	Bus::write8(sh2.gpr[mem] + offs, sh2.gpr[0]);
+}
+
 static void movw_reg_memrel(uint16_t instr)
 {
 	uint32_t offs = (instr & 0xF) << 1;
@@ -231,6 +253,14 @@ static void movl_reg_memrel(uint16_t instr)
 	uint32_t mem = (instr >> 8) & 0xF;
 
 	Bus::write32(sh2.gpr[mem] + offs, sh2.gpr[reg]);
+}
+
+static void movb_memrel_reg(uint16_t instr)
+{
+	uint32_t offs = instr & 0xF;
+	uint32_t mem = (instr >> 4) & 0xF;
+
+	sh2.gpr[0] = (int32_t)(int8_t)Bus::read8(sh2.gpr[mem] + offs);
 }
 
 static void movw_memrel_reg(uint16_t instr)
@@ -250,6 +280,14 @@ static void movl_memrel_reg(uint16_t instr)
 	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem] + offs);
 }
 
+static void movw_reg_memrelr0(uint16_t instr)
+{
+	uint32_t reg = (instr >> 4) & 0xF;
+	uint32_t mem = (instr >> 8) & 0xF;
+
+	Bus::write16(sh2.gpr[mem] + sh2.gpr[0], sh2.gpr[reg]);
+}
+
 static void movl_reg_memrelr0(uint16_t instr)
 {
 	uint32_t reg = (instr >> 4) & 0xF;
@@ -264,6 +302,22 @@ static void movb_memrelr0_reg(uint16_t instr)
 	uint32_t reg = (instr >> 8) & 0xF;
 
 	sh2.gpr[reg] = (int32_t)(int8_t)Bus::read8(sh2.gpr[mem] + sh2.gpr[0]);
+}
+
+static void movw_memrelr0_reg(uint16_t instr)
+{
+	uint32_t mem = (instr >> 4) & 0xF;
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	sh2.gpr[reg] = (int32_t)(int16_t)Bus::read16(sh2.gpr[mem] + sh2.gpr[0]);
+}
+
+static void movl_memrelr0_reg(uint16_t instr)
+{
+	uint32_t mem = (instr >> 4) & 0xF;
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem] + sh2.gpr[0]);
 }
 
 static void movb_reg_gbrrel(uint16_t instr)
@@ -340,6 +394,20 @@ static void add_imm(uint16_t instr)
 	sh2.gpr[reg] += imm;
 }
 
+static void addc(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	bool old_carry = GET_T();
+	uint32_t tmp = sh2.gpr[dst] + sh2.gpr[src];
+	uint32_t old_dst = sh2.gpr[dst];
+	sh2.gpr[dst] = tmp + old_carry;
+
+	bool new_carry = tmp > sh2.gpr[dst] || old_dst > tmp;
+	SET_T(new_carry);
+}
+
 static void cmpeq_imm(uint16_t instr)
 {
 	uint32_t imm = instr & 0xFF;
@@ -375,6 +443,15 @@ static void cmpge(uint16_t instr)
 	SET_T(result);
 }
 
+static void cmphi(uint16_t instr)
+{
+	uint32_t reg1 = (instr >> 4) & 0xF;
+	uint32_t reg2 = (instr >> 8) & 0xF;
+
+	bool result = sh2.gpr[reg2] > sh2.gpr[reg1];
+	SET_T(result);
+}
+
 static void cmpgt(uint16_t instr)
 {
 	uint32_t reg1 = (instr >> 4) & 0xF;
@@ -398,6 +475,63 @@ static void cmppz(uint16_t instr)
 
 	bool result = (int32_t)sh2.gpr[reg] >= 0;
 	SET_T(result);
+}
+
+static void div1(uint16_t instr)
+{
+	uint32_t denom = (instr >> 4) & 0xF;
+	uint32_t num = (instr >> 8) & 0xF;
+	
+	bool t = GET_T();
+	bool old_q = GET_Q();
+	bool m = GET_M();
+	bool new_q = sh2.gpr[num] >> 31;
+	bool tmp = false;
+
+	sh2.gpr[num] <<= 1;
+	sh2.gpr[num] |= t;
+
+	uint32_t old_num = sh2.gpr[num];
+
+	if (old_q == m)
+	{
+		sh2.gpr[num] -= sh2.gpr[denom];
+		tmp = sh2.gpr[num] > old_num;
+	}
+	else
+	{
+		sh2.gpr[num] += sh2.gpr[denom];
+		tmp = sh2.gpr[num] < old_num;
+	}
+
+	new_q = (new_q) ? !tmp : tmp;
+	if (m)
+	{
+		new_q = !new_q;
+	}
+	
+	SET_Q(new_q);
+	SET_T(new_q == m);
+}
+
+static void div0s(uint16_t instr)
+{
+	uint32_t reg1 = (instr >> 4) & 0xF;
+	uint32_t reg2 = (instr >> 8) & 0xF;
+
+	bool new_m = sh2.gpr[reg1] >> 31;
+	bool new_q = sh2.gpr[reg2] >> 31;
+	
+	SET_T(new_m ^ new_q);
+	SET_Q(new_q);
+	SET_M(new_m);
+}
+
+static void div0u(uint16_t instr)
+{
+	SET_T(false);
+	SET_Q(false);
+	SET_M(false);
 }
 
 static void extsb(uint16_t instr)
@@ -443,12 +577,34 @@ static void muluw(uint16_t instr)
 	sh2.macl = value1 * value2;
 }
 
+static void neg(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	sh2.gpr[dst] = -sh2.gpr[src];
+}
+
 static void sub(uint16_t instr)
 {
 	uint32_t src = (instr >> 4) & 0xF;
 	uint32_t dst = (instr >> 8) & 0xF;
 
 	sh2.gpr[dst] -= sh2.gpr[src];
+}
+
+static void subc(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	bool old_carry = GET_T();
+	uint32_t tmp = sh2.gpr[dst] - sh2.gpr[src];
+	uint32_t old_dst = sh2.gpr[dst];
+	sh2.gpr[dst] = tmp - old_carry;
+
+	bool new_carry = old_dst < tmp || tmp < sh2.gpr[dst];
+	SET_T(new_carry);
 }
 
 //Logic instructions
@@ -498,6 +654,14 @@ static void tst_imm(uint16_t instr)
 
 	bool result = (sh2.gpr[0] & imm) == 0;
 	SET_T(result);
+}
+
+static void xor_reg(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	sh2.gpr[dst] ^= sh2.gpr[src];
 }
 
 //Shift instructions
@@ -595,7 +759,14 @@ static void shlr8(uint16_t instr)
 static void shll16(uint16_t instr)
 {
 	uint32_t reg = (instr >> 8) & 0xF;
+
 	sh2.gpr[reg] <<= 16;
+}
+
+static void shlr16(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+	sh2.gpr[reg] >>= 16;
 }
 
 //Control flow instructions
@@ -704,6 +875,15 @@ static void stc_reg(uint16_t instr)
 	sh2.gpr[reg] = get_control_reg(index);
 }
 
+static void stcl_mem_dec(uint16_t instr)
+{
+	uint32_t reg = (instr >> 4) & 0xF;
+	uint32_t mem = (instr >> 8) & 0xF;
+
+	sh2.gpr[mem] -= 4;
+	Bus::write32(sh2.gpr[mem], get_control_reg(reg));
+}
+
 static void sts_reg(uint16_t instr)
 {
 	uint32_t index = (instr >> 4) & 0xF;
@@ -780,6 +960,10 @@ void run(uint16_t instr)
 	{
 		movl_mem_reg_inc(instr);
 	}
+	else if ((instr & 0xFF00) == 0x8000)
+	{
+		movb_reg_memrel(instr);
+	}
 	else if ((instr & 0xFF00) == 0x8100)
 	{
 		movw_reg_memrel(instr);
@@ -787,6 +971,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF000) == 0x1000)
 	{
 		movl_reg_memrel(instr);
+	}
+	else if ((instr & 0xFF00) == 0x8400)
+	{
+		movb_memrel_reg(instr);
 	}
 	else if ((instr & 0xFF00) == 0x8500)
 	{
@@ -796,6 +984,10 @@ void run(uint16_t instr)
 	{
 		movl_memrel_reg(instr);
 	}
+	else if ((instr & 0xF00F) == 0x0005)
+	{
+		movw_reg_memrelr0(instr);
+	}
 	else if ((instr & 0xF00F) == 0x0006)
 	{
 		movl_reg_memrelr0(instr);
@@ -803,6 +995,14 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x000C)
 	{
 		movb_memrelr0_reg(instr);
+	}
+	else if ((instr & 0xF00F) == 0x000D)
+	{
+		movw_memrelr0_reg(instr);
+	}
+	else if ((instr & 0xF00F) == 0x000E)
+	{
+		movl_memrelr0_reg(instr);
 	}
 	else if ((instr & 0xFF00) == 0xC000)
 	{
@@ -844,6 +1044,10 @@ void run(uint16_t instr)
 	{
 		add_imm(instr);
 	}
+	else if ((instr & 0xF00F) == 0x300E)
+	{
+		addc(instr);
+	}
 	else if ((instr & 0xFF00) == 0x8800)
 	{
 		cmpeq_imm(instr);
@@ -860,6 +1064,10 @@ void run(uint16_t instr)
 	{
 		cmpge(instr);
 	}
+	else if ((instr & 0xF00F) == 0x3006)
+	{
+		cmphi(instr);
+	}
 	else if ((instr & 0xF00F) == 0x3007)
 	{
 		cmpgt(instr);
@@ -871,6 +1079,18 @@ void run(uint16_t instr)
 	else if ((instr & 0xF0FF) == 0x4011)
 	{
 		cmppz(instr);
+	}
+	else if ((instr & 0xF00F) == 0x3004)
+	{
+		div1(instr);
+	}
+	else if ((instr & 0xF00F) == 0x2007)
+	{
+		div0s(instr);
+	}
+	else if (instr == 0x19)
+	{
+		div0u(instr);
 	}
 	else if ((instr & 0xF00F) == 0x600E)
 	{
@@ -892,9 +1112,17 @@ void run(uint16_t instr)
 	{
 		muluw(instr);
 	}
+	else if ((instr & 0xF00F) == 0x600B)
+	{
+		neg(instr);
+	}
 	else if ((instr & 0xF00F) == 0x3008)
 	{
 		sub(instr);
+	}
+	else if ((instr & 0xF00F) == 0x300A)
+	{
+		subc(instr);
 	}
 	else if ((instr & 0xF00F) == 0x2009)
 	{
@@ -919,6 +1147,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xFF00) == 0xC800)
 	{
 		tst_imm(instr);
+	}
+	else if ((instr & 0xF00F) == 0x200A)
+	{
+		xor_reg(instr);
 	}
 	else if ((instr & 0xF0FF) == 0x4004)
 	{
@@ -967,6 +1199,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF0FF) == 0x4028)
 	{
 		shll16(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4029)
+	{
+		shlr16(instr);
 	}
 	else if ((instr & 0xFF00) == 0x8B00)
 	{
@@ -1019,6 +1255,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x0002)
 	{
 		stc_reg(instr);
+	}
+	else if ((instr & 0xF00F) == 0x4003)
+	{
+		stcl_mem_dec(instr);
 	}
 	else if ((instr & 0xF00F) == 0x000A)
 	{
