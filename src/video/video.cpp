@@ -1,15 +1,19 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <core/timing.h>
 #include "video/vdp_local.h"
 #include "video/video.h"
 
 namespace Video
 {
 
+static Timing::FuncHandle vcount_func;
+static Timing::EventHandle vcount_ev;
+
 VDP vdp;
 
-static void inc_vcount()
+static void inc_vcount(uint64_t param, int cycles_late)
 {
 	vdp.vcount++;
 	
@@ -17,19 +21,35 @@ static void inc_vcount()
 	//TODO: is 0x1D8 the correct starting value?
 	if (vdp.vcount == 0x0E0)
 	{
+		printf("[Video] VSYNC start\n");
 		vdp.vcount = 0x1D8;
 	}
 
 	//At the end of VSYNC, wrap around to the start of the visible region
 	if (vdp.vcount == 0x200)
 	{
+		printf("[Video] VSYNC end\n");
 		vdp.vcount = 0;
 	}
+
+	//Based upon the above numbers
+	constexpr static int LINES_PER_FRAME = 0xE0 + (0x200 - 0x1D8);
+
+	constexpr static int CYCLES_PER_FRAME = Timing::F_CPU / 60;
+	constexpr static int CYCLES_PER_LINE = CYCLES_PER_FRAME / LINES_PER_FRAME;
+
+	Timing::UnitCycle sched_cycles = Timing::convert_cpu(CYCLES_PER_LINE - cycles_late);
+	vcount_ev = Timing::add_event(vcount_func, sched_cycles, 0, Timing::CPU_TIMER);
 }
 
 void initialize()
 {
 	vdp = {};
+
+	vcount_func = Timing::register_func("Video::inc_vcount", inc_vcount);
+
+	//Kickstart the VCOUNT event
+	inc_vcount(0, 0);
 }
 
 void shutdown()
@@ -168,40 +188,40 @@ void bitmap_reg_write16(uint32_t addr, uint16_t value)
 	switch (reg)
 	{
 	case 0x000:
-		printf("[VDP] write bitmap%d x: %04X\n", index, value);
+		printf("[Video] write bitmap%d x: %04X\n", index, value);
 		layer->x = value;
 		break;
 	case 0x008:
-		printf("[VDP] write bitmap%d y: %04X\n", index, value);
+		printf("[Video] write bitmap%d y: %04X\n", index, value);
 		layer->y = value;
 		break;
 	case 0x010:
-		printf("[VDP] write bitmap%d 010: %04X\n", index, value);
+		printf("[Video] write bitmap%d 010: %04X\n", index, value);
 		layer->unk1 = value;
 		break;
 	case 0x018:
-		printf("[VDP] write bitmap%d 018: %04X\n", index, value);
+		printf("[Video] write bitmap%d 018: %04X\n", index, value);
 		layer->unk2 = value;
 		break;
 	case 0x020:
-		printf("[VDP] write bitmap%d w+unk: %04X\n", index, value);
+		printf("[Video] write bitmap%d w+unk: %04X\n", index, value);
 		layer->w = value & 0xFF;
 		layer->unk3 = value >> 8;
 		break;
 	case 0x028:
-		printf("[VDP] write bitmap%d h: %04X\n", index, value);
+		printf("[Video] write bitmap%d h: %04X\n", index, value);
 		layer->h = value;
 		break;
 	case 0x030:
-		printf("[VDP] write bitmap 030: %04X\n", value);
+		printf("[Video] write bitmap 030: %04X\n", value);
 		vdp.bitmap_030 = value;
 		break;
 	case 0x040:
-		printf("[VDP] write bitmap 040: %04X\n", value);
+		printf("[Video] write bitmap 040: %04X\n", value);
 		vdp.bitmap_040 = value;
 		break;
 	case 0x050:
-		printf("[VDP] write bitmap%d 050: %04X\n", index, value);
+		printf("[Video] write bitmap%d 050: %04X\n", index, value);
 		layer->unk4 = value;
 		break;
 	default:
@@ -229,13 +249,7 @@ uint16_t ctrl_read16(uint32_t addr)
 		printf("[Video] read ctrl 000\n");
 		return 0;
 	case 0x004:
-	{
-		uint16_t vcount = vdp.vcount;
-
-		//FIXME: Dirty hack, should be part of a future scheduler
-		inc_vcount();
-		return vcount;
-	}
+		return vdp.vcount;
 	default:
 		assert(0);
 		return 0;

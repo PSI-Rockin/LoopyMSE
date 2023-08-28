@@ -4,6 +4,8 @@ add_library (core STATIC
 			 "memory.h"
 			 "system.cpp"
 			 "system.h"
+			 "timing.cpp"
+			 "timing.h"
 
 			 "sh2/sh2.cpp"
 			 "sh2/sh2.h"

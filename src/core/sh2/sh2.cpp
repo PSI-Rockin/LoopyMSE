@@ -6,6 +6,7 @@
 #include "core/sh2/sh2_interpreter.h"
 #include "core/sh2/sh2_local.h"
 #include "core/memory.h"
+#include "core/timing.h"
 
 namespace SH2
 {
@@ -22,6 +23,8 @@ void initialize()
 	//Add 4 to account for pipelining
 	sh2.pc = 0x0E000480 + 4;
 
+	Timing::register_timer(Timing::CPU_TIMER, &sh2.cycles_left, run);
+
 	//Set up on-chip peripheral modules after CPU is done
 	OCPM::DMAC::initialize();
 }
@@ -33,9 +36,13 @@ void shutdown()
 
 void run()
 {
-	uint16_t instr = Bus::read16(sh2.pc - 4);
-	SH2::Interpreter::run(instr);
-	sh2.pc += 2;
+	while (sh2.cycles_left)
+	{
+		uint16_t instr = Bus::read16(sh2.pc - 4);
+		SH2::Interpreter::run(instr);
+		sh2.cycles_left--;
+		sh2.pc += 2;
+	}
 }
 
 }
