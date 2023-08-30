@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstdio>
 #include <tuple>
+#include "core/sh2/peripherals/sh2_intc.h"
 #include "core/sh2/peripherals/sh2_timers.h"
 #include "core/timing.h"
 
@@ -14,6 +15,7 @@ static Timing::FuncHandle ev_func;
 struct Timer
 {
 	Timing::EventHandle ev;
+	INTC::IRQ irq;
 	int enabled;
 	int id;
 
@@ -138,7 +140,14 @@ static void intr_event(uint64_t param, int cycles_late)
 		timer->counter = 0;
 	}
 
-	//TODO: trigger interrupt when (intr_flag & intr_enable) != 0
+	for (int i = 0; i < 3; i++)
+	{
+		if (timer->intr_enable & timer->intr_flag & (1 << i))
+		{
+			INTC::assert_irq(timer->irq, i);
+			break;
+		}
+	}
 
 	//Restart the timer
 	timer->start();
@@ -181,6 +190,12 @@ void initialize()
 	{
 		state.timers[i].id = i;
 	}
+
+	state.timers[0].irq = INTC::IRQ::ITU0;
+	state.timers[1].irq = INTC::IRQ::ITU1;
+	state.timers[2].irq = INTC::IRQ::ITU2;
+	state.timers[3].irq = INTC::IRQ::ITU3;
+	state.timers[4].irq = INTC::IRQ::ITU4;
 
 	ev_func = Timing::register_func("Timer::intr_event", intr_event);
 }

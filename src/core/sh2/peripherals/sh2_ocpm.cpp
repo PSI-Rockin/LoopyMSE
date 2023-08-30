@@ -1,5 +1,6 @@
 #include <cstdio>
 #include "core/sh2/peripherals/sh2_dmac.h"
+#include "core/sh2/peripherals/sh2_intc.h"
 #include "core/sh2/peripherals/sh2_ocpm.h"
 #include "core/sh2/peripherals/sh2_timers.h"
 
@@ -11,6 +12,9 @@ constexpr static int TIMER_END = 0xF40;
 
 constexpr static int DMAC_START = 0xF40;
 constexpr static int DMAC_END = 0xF80;
+
+constexpr static int INTC_START = 0xF88;
+constexpr static int INTC_END = 0xF90;
 
 uint8_t read8(uint32_t addr)
 {
