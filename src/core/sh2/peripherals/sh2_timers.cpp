@@ -2,14 +2,19 @@
 #include <cstdio>
 #include <tuple>
 #include "core/sh2/peripherals/sh2_timers.h"
+#include "core/timing.h"
 
 namespace SH2::OCPM::Timer
 {
 
 constexpr static int TIMER_COUNT = 5;
 
+static Timing::FuncHandle ev_func;
+
 struct Timer
 {
+	Timing::EventHandle ev;
+	int enabled;
 	int id;
 
 	struct Ctrl
@@ -24,8 +29,64 @@ struct Timer
 	int intr_enable;
 	int intr_flag;
 
-	uint16_t counter;
-	uint16_t gen_reg[2];
+	uint32_t counter;
+	uint32_t counter_when_started;
+	uint32_t gen_reg[2];
+
+	int64_t time_when_started;
+
+	void update_counter()
+	{
+		if (!ev.is_valid())
+		{
+			return;
+		}
+
+		assert(!(ctrl.clock & ~0x3));
+
+		int64_t time_elapsed = Timing::get_timestamp(Timing::CPU_TIMER) - time_when_started;
+		counter = counter_when_started + (time_elapsed >> ctrl.clock);
+		counter &= 0xFFFF;
+	}
+
+	void set_enable(bool new_enable)
+	{
+		enabled = new_enable;
+
+		if (!ev.is_valid() && enabled)
+		{
+			start();
+		}
+		else if (ev.is_valid() && !enabled)
+		{
+			Timing::cancel_event(ev);
+		}
+	}
+
+	void start()
+	{
+		assert(!(ctrl.clock & ~0x3));
+		assert(!ctrl.edge_mode);
+		assert(ctrl.clear_mode != 3);
+
+		//Calculate the target which will take the smallest amount of time to reach
+		constexpr static uint32_t OVERFLOW_TARGET = 0x10000;
+		uint32_t nearest_target = OVERFLOW_TARGET;
+		for (int i = 0; i < 2; i++)
+		{
+			if (counter < gen_reg[i])
+			{
+				nearest_target = std::min(nearest_target, gen_reg[i]);
+			}
+		}
+
+		uint32_t cycles = (nearest_target - counter) << ctrl.clock;
+		Timing::UnitCycle sched_cycles = Timing::convert_cpu(cycles);
+		ev = Timing::add_event(ev_func, sched_cycles, (uint64_t)this, Timing::CPU_TIMER);
+
+		time_when_started = Timing::get_timestamp(Timing::CPU_TIMER);
+		counter_when_started = counter;
+	}
 };
 
 struct State
@@ -40,6 +101,48 @@ struct State
 typedef std::tuple<Timer*, int> TimerDev;
 
 static State state;
+
+static void intr_event(uint64_t param, int cycles_late)
+{
+	assert(!cycles_late);
+	Timer* timer = (Timer*)param;
+
+	timer->update_counter();
+
+	bool clear_counter = false;
+
+	//Compare 1
+	if (timer->counter == timer->gen_reg[0])
+	{
+		timer->intr_flag |= 0x1;
+		if (timer->ctrl.clear_mode == 0x1)
+		{
+			clear_counter = true;
+		}
+	}
+
+	//Compare 2
+	if (timer->counter == timer->gen_reg[1])
+	{
+		assert(0);
+	}
+
+	//Overflow
+	if (timer->counter == 0)
+	{
+		assert(0);
+	}
+
+	if (clear_counter)
+	{
+		timer->counter = 0;
+	}
+
+	//TODO: trigger interrupt when (intr_flag & intr_enable) != 0
+
+	//Restart the timer
+	timer->start();
+}
 
 static TimerDev get_dev_from_addr(uint32_t addr)
 {
@@ -72,11 +175,14 @@ static TimerDev get_dev_from_addr(uint32_t addr)
 void initialize()
 {
 	state = {};
+	ev_func = {};
 
 	for (int i = 0; i < TIMER_COUNT; i++)
 	{
 		state.timers[i].id = i;
 	}
+
+	ev_func = Timing::register_func("Timer::intr_event", intr_event);
 }
 
 uint8_t read8(uint32_t addr)
@@ -134,9 +240,6 @@ void write8(uint32_t addr, uint8_t value)
 			timer->ctrl.clock = value & 0x7;
 			timer->ctrl.edge_mode = (value >> 3) & 0x3;
 			timer->ctrl.clear_mode = (value >> 5) & 0x3;
-
-			assert(!timer->ctrl.edge_mode);
-			assert(timer->ctrl.clear_mode != 3);
 			break;
 		case 0x01:
 			printf("[Timer] write timer%d io ctrl: %02X\n", timer->id, value);
@@ -169,6 +272,11 @@ void write8(uint32_t addr, uint8_t value)
 	case 0x00:
 		printf("[Timer] write master enable: %02X\n", value);
 		state.timer_enable = value & 0x1F;
+
+		for (int i = 0; i < TIMER_COUNT; i++)
+		{
+			state.timers[i].set_enable((value >> i) & 0x1);
+		}
 		break;
 	case 0x01:
 		printf("[Timer] write sync ctrl: %02X\n", value);
