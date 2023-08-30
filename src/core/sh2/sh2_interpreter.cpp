@@ -351,6 +351,12 @@ static void movw_reg_gbrrel(uint16_t instr)
 	Bus::write16(sh2.gbr + offs, sh2.gpr[0]);
 }
 
+static void movl_reg_gbrrel(uint16_t instr)
+{
+	uint32_t offs = (instr & 0xFF) << 2;
+	Bus::write32(sh2.gbr + offs, sh2.gpr[0]);
+}
+
 static void movb_gbrrel_reg(uint16_t instr)
 {
 	uint32_t offs = instr & 0xFF;
@@ -1064,6 +1070,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xFF00) == 0xC100)
 	{
 		movw_reg_gbrrel(instr);
+	}
+	else if ((instr & 0xFF00) == 0xC200)
+	{
+		movl_reg_gbrrel(instr);
 	}
 	else if ((instr & 0xFF00) == 0xC400)
 	{
