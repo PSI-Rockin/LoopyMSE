@@ -220,7 +220,10 @@ static void movb_mem_reg_inc(uint16_t instr)
 	uint32_t reg = (instr >> 8) & 0xF;
 
 	sh2.gpr[reg] = (int32_t)(int8_t)Bus::read8(sh2.gpr[mem]);
-	sh2.gpr[mem]++;
+	if (mem != reg)
+	{
+		sh2.gpr[mem]++;
+	}
 }
 
 static void movw_mem_reg_inc(uint16_t instr)
@@ -229,7 +232,10 @@ static void movw_mem_reg_inc(uint16_t instr)
 	uint32_t reg = (instr >> 8) & 0xF;
 
 	sh2.gpr[reg] = (int32_t)(int16_t)Bus::read16(sh2.gpr[mem]);
-	sh2.gpr[mem] += 2;
+	if (mem != reg)
+	{
+		sh2.gpr[mem] += 2;
+	}
 }
 
 static void movl_mem_reg_inc(uint16_t instr)
@@ -238,7 +244,10 @@ static void movl_mem_reg_inc(uint16_t instr)
 	uint32_t reg = (instr >> 8) & 0xF;
 
 	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem]);
-	sh2.gpr[mem] += 4;
+	if (mem != reg)
+	{
+		sh2.gpr[mem] += 4;
+	}
 }
 
 static void movb_reg_memrel(uint16_t instr)
@@ -913,6 +922,17 @@ static void ldsl_mem_inc(uint16_t instr)
 	sh2.gpr[mem] += 4;
 }
 
+static void rte(uint16_t instr)
+{
+	uint32_t new_pc = Bus::read32(sh2.gpr[15]);
+	sh2.gpr[15] += 4;
+
+	sh2.sr = Bus::read32(sh2.gpr[15]) & 0x3F3;
+	sh2.gpr[15] += 4;
+
+	handle_jump(new_pc, true);
+}
+
 static void sett(uint16_t instr)
 {
 	SET_T(true);
@@ -1318,6 +1338,10 @@ void run(uint16_t instr)
 	else if (instr == 0x0009)
 	{
 		//nop
+	}
+	else if (instr == 0x002B)
+	{
+		rte(instr);
 	}
 	else if (instr == 0x0018)
 	{

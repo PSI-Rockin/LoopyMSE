@@ -58,7 +58,7 @@ void raise_exception(int vector_id)
 	sh2.gpr[15] -= 4;
 	Bus::write32(sh2.gpr[15], sh2.sr);
 	sh2.gpr[15] -= 4;
-	Bus::write32(sh2.gpr[15], sh2.pc);
+	Bus::write32(sh2.gpr[15], sh2.pc - 4);
 
 	uint32_t vector_addr = sh2.vbr + (vector_id * 4);
 	uint32_t new_pc = Bus::read32(vector_addr);
