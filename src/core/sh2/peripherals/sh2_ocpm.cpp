@@ -2,10 +2,14 @@
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/peripherals/sh2_intc.h"
 #include "core/sh2/peripherals/sh2_ocpm.h"
+#include "core/sh2/peripherals/sh2_serial.h"
 #include "core/sh2/peripherals/sh2_timers.h"
 
 namespace SH2::OCPM
 {
+
+constexpr static int SERIAL_START = 0xEC0;
+constexpr static int SERIAL_END = 0xED0;
 
 constexpr static int TIMER_START = 0xF00;
 constexpr static int TIMER_END = 0xF40;
@@ -19,6 +23,11 @@ constexpr static int INTC_END = 0xF90;
 uint8_t read8(uint32_t addr)
 {
 	addr = (addr & 0x1FF) + 0xE00;
+
+	if (addr >= SERIAL_START && addr < SERIAL_END)
+	{
+		return Serial::read8(addr);
+	}
 
 	if (addr >= TIMER_START && addr < TIMER_END)
 	{
@@ -69,6 +78,13 @@ uint32_t read32(uint32_t addr)
 void write8(uint32_t addr, uint8_t value)
 {
 	addr = (addr & 0x1FF) + 0xE00;
+
+	if (addr >= SERIAL_START && addr < SERIAL_END)
+	{
+		Serial::write8(addr, value);
+		return;
+	}
+
 	if (addr >= TIMER_START && addr < TIMER_END)
 	{
 		Timer::write8(addr, value);

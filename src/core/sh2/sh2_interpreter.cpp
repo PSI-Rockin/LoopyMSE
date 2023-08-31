@@ -450,7 +450,7 @@ static void addv(uint16_t instr)
 
 static void cmpeq_imm(uint16_t instr)
 {
-	uint32_t imm = instr & 0xFF;
+	int32_t imm = (int32_t)(int8_t)(instr & 0xFF);
 
 	bool result = sh2.gpr[0] == imm;
 	SET_T(result);

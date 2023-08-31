@@ -2,6 +2,7 @@
 #include <common/bswp.h>
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/peripherals/sh2_intc.h"
+#include "core/sh2/peripherals/sh2_serial.h"
 #include "core/sh2/peripherals/sh2_timers.h"
 #include "core/sh2/sh2.h"
 #include "core/sh2/sh2_bus.h"
@@ -29,6 +30,7 @@ void initialize()
 	//Set up on-chip peripheral modules after CPU is done
 	OCPM::DMAC::initialize();
 	OCPM::INTC::initialize();
+	OCPM::Serial::initialize();
 	OCPM::Timer::initialize();
 }
 
