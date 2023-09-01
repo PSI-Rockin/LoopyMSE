@@ -27,10 +27,24 @@ enum class IRQ
 	ITU1,
 	ITU2,
 	ITU3,
-	ITU4
+	ITU4,
+
+	SCI0,
+	SCI1,
+
+	PRT,
+
+	WDT,
+
+	REF,
+
+	NumIrq
 };
 
 void initialize();
+
+uint16_t read16(uint32_t addr);
+void write16(uint32_t addr, uint16_t value);
 
 void assert_irq(IRQ irq, int info);
 

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <common/bswp.h>
 #include "core/sh2/peripherals/sh2_dmac.h"
@@ -48,6 +49,19 @@ void run()
 		sh2.cycles_left--;
 		sh2.pc += 2;
 	}
+}
+
+void raise_irq(int vector_id, int prio)
+{
+	int imask = (sh2.sr >> 4) & 0xF;
+	assert(prio > imask);
+
+	raise_exception(vector_id);
+
+	//Interrupt mask should only be modified after the above function so that the original value can be pushed onto the stack
+	prio = std::clamp(prio, 0, 15);
+	sh2.sr &= ~0xF0;
+	sh2.sr |= prio << 4;
 }
 
 void raise_exception(int vector_id)

@@ -17,7 +17,7 @@ constexpr static int TIMER_END = 0xF40;
 constexpr static int DMAC_START = 0xF40;
 constexpr static int DMAC_END = 0xF80;
 
-constexpr static int INTC_START = 0xF88;
+constexpr static int INTC_START = 0xF84;
 constexpr static int INTC_END = 0xF90;
 
 uint8_t read8(uint32_t addr)
@@ -54,6 +54,11 @@ uint16_t read16(uint32_t addr)
 	if (addr >= DMAC_START && addr < DMAC_END)
 	{
 		return DMAC::read16(addr);
+	}
+
+	if (addr >= INTC_START && addr < INTC_END)
+	{
+		return INTC::read16(addr);
 	}
 
 	switch (addr)
@@ -110,6 +115,12 @@ void write16(uint32_t addr, uint16_t value)
 	if (addr >= DMAC_START && addr < DMAC_END)
 	{
 		DMAC::write16(addr, value);
+		return;
+	}
+
+	if (addr >= INTC_START && addr < INTC_END)
+	{
+		INTC::write16(addr, value);
 		return;
 	}
 
