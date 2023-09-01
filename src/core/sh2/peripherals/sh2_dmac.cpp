@@ -43,49 +43,63 @@ struct Channel
 	void set_ctrl(uint16_t value)
 	{
 		ctrl.enable = value & 0x1;
-		ctrl.finished &= ~((value >> 1) & 0x1);
+		ctrl.finished &= (value >> 1) & 0x1;
 		ctrl.irq_enable = (value >> 2) & 0x1;
 		ctrl.transfer_16bit = (value >> 3) & 0x1;
 		ctrl.is_burst = (value >> 4) & 0x1;
 		ctrl.unk_ack_bits = (value >> 5) & 0x7;
-		ctrl.mode = (value >> 8) & 0xF;
+		ctrl.mode = ((value >> 8) & 0xF);
 		ctrl.src_step = (value >> 12) & 0x3;
 		ctrl.dst_step = (value >> 14) & 0x3;
 	}
 
-	void start_transfer()
+	void start_transfer();
+};
+
+struct State
+{
+	Channel chan[4];
+	int dreqs[(int)DREQ::NumDreq];
+	uint16_t ctrl;
+};
+
+static State state;
+
+void Channel::start_transfer()
+{
+	//TODO: time these transfers instead of doing them all at once?
+	assert(!ctrl.irq_enable);
+
+	int src_step = 0;
+	switch (ctrl.src_step)
 	{
-		//TODO: time these transfers instead of doing them all at once?
-		assert(!ctrl.irq_enable);
-		assert(ctrl.transfer_16bit);
-		assert(ctrl.is_burst);
-		assert(ctrl.mode == 0x0C);
+	case 1:
+		src_step = 1;
+		break;
+	case 2:
+		src_step = -1;
+		break;
+	}
 
-		int src_step = 0;
-		switch (ctrl.src_step)
-		{
-		case 1:
-			src_step = 2;
-			break;
-		case 2:
-			src_step = -2;
-			break;
-		}
+	int dst_step = 0;
+	switch (ctrl.dst_step)
+	{
+	case 1:
+		dst_step = 1;
+		break;
+	case 2:
+		dst_step = -1;
+		break;
+	}
 
-		int dst_step = 0;
-		switch (ctrl.dst_step)
-		{
-		case 1:
-			dst_step = 2;
-			break;
-		case 2:
-			dst_step = -2;
-			break;
-		}
+	src_step <<= ctrl.transfer_16bit;
+	dst_step <<= ctrl.transfer_16bit;
 
-		while (transfer_size)
+	//TODO: speed this up by doing memcpy if both addresses are in Memory
+	if (ctrl.transfer_16bit)
+	{
+		while (transfer_size && state.dreqs[ctrl.mode])
 		{
-			//TODO: speed this up by doing memcpy if both addresses are in Memory
 			uint16_t value = SH2::Bus::read16(src_addr);
 			SH2::Bus::write16(dst_addr, value);
 
@@ -93,18 +107,43 @@ struct Channel
 			dst_addr += dst_step;
 			transfer_size--;
 		}
+	}
+	else
+	{
+		while (transfer_size && state.dreqs[ctrl.mode])
+		{
+			uint8_t value = SH2::Bus::read8(src_addr);
+			SH2::Bus::write8(dst_addr, value);
 
+			src_addr += src_step;
+			dst_addr += dst_step;
+			transfer_size--;
+		}
+	}
+
+	if (!transfer_size)
+	{
 		ctrl.finished = true;
 	}
-};
+}
 
-struct State
+static void check_activations()
 {
-	Channel chan[4];
-	uint16_t ctrl;
-};
+	//TODO: check NMI and address error flags
+	bool master_enable = state.ctrl & 0x1;
+	if (!master_enable)
+	{
+		return;
+	}
 
-static State state;
+	for (auto& x : state.chan)
+	{
+		if (x.ctrl.enable && !x.ctrl.finished && state.dreqs[x.ctrl.mode])
+		{
+			x.start_transfer();
+		}
+	}
+}
 
 uint16_t read16(uint32_t addr)
 {
@@ -149,10 +188,7 @@ void write16(uint32_t addr, uint16_t value)
 		break;
 	case 0x0E:
 		chan->set_ctrl(value);
-		if (chan->ctrl.enable)
-		{
-			chan->start_transfer();
-		}
+		check_activations();
 		break;
 	default:
 		assert(0);
@@ -181,6 +217,20 @@ void write32(uint32_t addr, uint32_t value)
 void initialize()
 {
 	state = {};
+
+	//Auto mode should always go through
+	send_dreq(DREQ::Auto);
+}
+
+void send_dreq(DREQ dreq)
+{
+	state.dreqs[(int)dreq] = true;
+	check_activations();
+}
+
+void clear_dreq(DREQ dreq)
+{
+	state.dreqs[(int)dreq] = false;
 }
 
 }
