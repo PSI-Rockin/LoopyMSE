@@ -35,6 +35,7 @@ constexpr static int DISPLAY_REG_END = 0x0405C000;
 
 void initialize();
 void shutdown();
+void dump_for_serial();
 
 //TODO: should these MMIO accessors be moved to a different file?
 uint8_t palette_read8(uint32_t addr);
@@ -44,6 +45,14 @@ uint32_t palette_read32(uint32_t addr);
 void palette_write8(uint32_t addr, uint8_t value);
 void palette_write16(uint32_t addr, uint16_t value);
 void palette_write32(uint32_t addr, uint32_t value);
+
+uint8_t oam_read8(uint32_t addr);
+uint16_t oam_read16(uint32_t addr);
+uint32_t oam_read32(uint32_t addr);
+
+void oam_write8(uint32_t addr, uint8_t value);
+void oam_write16(uint32_t addr, uint16_t value);
+void oam_write32(uint32_t addr, uint32_t value);
 
 uint8_t capture_read8(uint32_t addr);
 uint16_t capture_read16(uint32_t addr);

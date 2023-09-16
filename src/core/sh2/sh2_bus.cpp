@@ -25,6 +25,8 @@ static uint32_t translate_addr(uint32_t addr)
 #define MMIO_ACCESS(access, ...)											\
 	if (addr >= Video::PALETTE_START && addr < Video::PALETTE_END)			\
 		return Video::palette_##access(__VA_ARGS__);						\
+	if (addr >= Video::OAM_START && addr < Video::OAM_END)					\
+		return Video::oam_##access(__VA_ARGS__);							\
 	if (addr >= Video::CAPTURE_START && addr < Video::CAPTURE_END)			\
 		return Video::capture_##access(__VA_ARGS__);						\
 	if (addr >= Video::CTRL_REG_START && addr < Video::CTRL_REG_END)		\

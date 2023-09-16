@@ -6,6 +6,12 @@ namespace Video
 
 struct VDP
 {
+	//Bitmap VRAM - 0x0C000000
+	uint8_t bitmap[BITMAP_VRAM_SIZE];
+
+	//Tile VRAM - 0x0C040000
+	uint8_t tile[TILE_VRAM_SIZE];
+
 	//OAM - 0x0C050000
 	uint8_t oam[OAM_SIZE];
 

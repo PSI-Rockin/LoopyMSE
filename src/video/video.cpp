@@ -1,6 +1,9 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <common/bswp.h>
+#include <core/memory.h>
 #include <core/timing.h>
 #include "video/vdp_local.h"
 #include "video/video.h"
@@ -12,6 +15,13 @@ static Timing::FuncHandle vcount_func;
 static Timing::EventHandle vcount_ev;
 
 VDP vdp;
+
+struct DumpHeader
+{
+	uint32_t addr;
+	uint32_t length;
+	uint32_t data_width;
+};
 
 static void inc_vcount(uint64_t param, int cycles_late)
 {
@@ -42,6 +52,17 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	vcount_ev = Timing::add_event(vcount_func, sched_cycles, 0, Timing::CPU_TIMER);
 }
 
+static void dump_serial_region(std::ofstream& dump, uint8_t* mem, uint32_t addr, uint32_t length)
+{
+	DumpHeader header;
+	header.addr = Common::bswp32(addr | (1 << 27)); //Make sure the address is 16-bit for the CPU
+	header.length = Common::bswp32(length);
+	header.data_width = Common::bswp32(2);
+
+	dump.write((char*)&header, sizeof(header));
+	dump.write((char*)mem, length);
+}
+
 void initialize()
 {
 	vdp = {};
@@ -50,11 +71,30 @@ void initialize()
 
 	//Kickstart the VCOUNT event
 	inc_vcount(0, 0);
+
+	//Map VRAM to the CPU
+	Memory::map_sh2_pagetable(vdp.bitmap, BITMAP_VRAM_START, BITMAP_VRAM_SIZE);
+	Memory::map_sh2_pagetable(vdp.tile, TILE_VRAM_START, TILE_VRAM_SIZE);
 }
 
 void shutdown()
 {
 	// nop
+}
+
+void dump_for_serial()
+{
+	std::ofstream dump("emudump.bin", std::ios::binary);
+	const char* MAGIC = "LPSTATE\0";
+
+	dump.write(MAGIC, 8);
+
+	dump_serial_region(dump, vdp.bitmap, BITMAP_VRAM_START, BITMAP_VRAM_SIZE);
+	dump_serial_region(dump, vdp.tile, TILE_VRAM_START, TILE_VRAM_SIZE);
+	dump_serial_region(dump, vdp.palette, PALETTE_START, PALETTE_SIZE);
+	dump_serial_region(dump, vdp.oam, OAM_START, OAM_SIZE);
+
+	//TODO: dump MMIO
 }
 
 uint8_t palette_read8(uint32_t addr)
@@ -66,14 +106,14 @@ uint16_t palette_read16(uint32_t addr)
 {
 	uint16_t value;
 	memcpy(&value, &vdp.palette[addr & 0x1FF], 2);
-	return value;
+	return Common::bswp16(value);
 }
 
 uint32_t palette_read32(uint32_t addr)
 {
 	uint32_t value;
 	memcpy(&value, &vdp.palette[addr & 0x1FF], 4);
-	return value;
+	return Common::bswp32(value);
 }
 
 void palette_write8(uint32_t addr, uint8_t value)
@@ -83,12 +123,51 @@ void palette_write8(uint32_t addr, uint8_t value)
 
 void palette_write16(uint32_t addr, uint16_t value)
 {
+	value = Common::bswp16(value);
 	memcpy(&vdp.palette[addr & 0x1FF], &value, 2);
 }
 
 void palette_write32(uint32_t addr, uint32_t value)
 {
+	value = Common::bswp32(value);
 	memcpy(&vdp.palette[addr & 0x1FF], &value, 4);
+}
+
+uint8_t oam_read8(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+uint16_t oam_read16(uint32_t addr)
+{
+	uint16_t value;
+	memcpy(&value, &vdp.oam[addr & 0x1FF], 2);
+	return Common::bswp16(value);
+}
+
+uint32_t oam_read32(uint32_t addr)
+{
+	uint32_t value;
+	memcpy(&value, &vdp.oam[addr & 0x1FF], 4);
+	return Common::bswp32(value);
+}
+
+void oam_write8(uint32_t addr, uint8_t value)
+{
+	assert(0);
+}
+
+void oam_write16(uint32_t addr, uint16_t value)
+{
+	value = Common::bswp16(value);
+	memcpy(&vdp.oam[addr & 0x1FF], &value, 2);
+}
+
+void oam_write32(uint32_t addr, uint32_t value)
+{
+	value = Common::bswp32(value);
+	memcpy(&vdp.oam[addr & 0x1FF], &value, 4);
 }
 
 uint8_t capture_read8(uint32_t addr)

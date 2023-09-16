@@ -1,5 +1,4 @@
 #include <memory>
-#include <video/video.h>
 #include "core/memory.h"
 
 namespace Memory
@@ -17,8 +16,6 @@ struct State
 
 	uint8_t bios[BIOS_SIZE];
 	uint8_t ram[RAM_SIZE];
-	uint8_t bitmap_vram[Video::BITMAP_VRAM_SIZE];
-	uint8_t tile_vram[Video::TILE_VRAM_SIZE];
 };
 
 std::unique_ptr<State> state;
@@ -44,16 +41,21 @@ void initialize(std::vector<uint8_t>& bios_rom, std::vector<uint8_t>& cart_rom)
 	state->sh2_pagetable.resize(SH2_PAGETABLE_SIZE);
 	std::fill(state->sh2_pagetable.begin(), state->sh2_pagetable.end(), nullptr);
 
-	map_pagetable(state->sh2_pagetable, state->bios, BIOS_START, BIOS_SIZE);
-	map_pagetable(state->sh2_pagetable, state->ram, RAM_START, RAM_SIZE);
-	map_pagetable(state->sh2_pagetable, state->bitmap_vram, Video::BITMAP_VRAM_START, Video::BITMAP_VRAM_SIZE);
-	map_pagetable(state->sh2_pagetable, state->tile_vram, Video::TILE_VRAM_START, Video::TILE_VRAM_SIZE);
-	map_pagetable(state->sh2_pagetable, state->cart.data(), CART_START, state->cart.size());
+	map_sh2_pagetable(state->bios, BIOS_START, BIOS_SIZE);
+	map_sh2_pagetable(state->ram, RAM_START, RAM_SIZE);
+	map_sh2_pagetable(state->cart.data(), CART_START, state->cart.size());
+
+	//VRAM is mapped by the Video subproject
 }
 
 void shutdown()
 {
 	state = nullptr;
+}
+
+void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size)
+{
+	map_pagetable(state->sh2_pagetable, data, start, size);
 }
 
 uint8_t** get_sh2_pagetable()
