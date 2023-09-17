@@ -228,15 +228,15 @@ uint16_t bitmap_reg_read16(uint32_t addr)
 	switch (reg)
 	{
 	case 0x000:
-		return layer->x;
+		return layer->scrollx;
 	case 0x008:
-		return layer->y;
+		return layer->scrolly;
 	case 0x010:
-		return layer->unk1;
+		return layer->screenx;
 	case 0x018:
-		return layer->unk2;
+		return layer->screeny;
 	case 0x020:
-		return layer->w | (layer->unk3 << 8);
+		return layer->w | (layer->clipx << 8);
 	case 0x028:
 		return layer->h;
 	case 0x030:
@@ -244,7 +244,7 @@ uint16_t bitmap_reg_read16(uint32_t addr)
 	case 0x040:
 		return vdp.bitmap_040;
 	case 0x050:
-		return layer->unk4;
+		return layer->unk;
 	default:
 		assert(0);
 		return 0;
@@ -273,29 +273,29 @@ void bitmap_reg_write16(uint32_t addr, uint16_t value)
 	switch (reg)
 	{
 	case 0x000:
-		printf("[Video] write bitmap%d x: %04X\n", index, value);
-		layer->x = value;
+		printf("[Video] write BM%d_SCROLLX: %04X\n", index, value);
+		layer->scrollx = value & 0xFF;
 		break;
 	case 0x008:
-		printf("[Video] write bitmap%d y: %04X\n", index, value);
-		layer->y = value;
+		printf("[Video] write BM%d_SCROLLY: %04X\n", index, value);
+		layer->scrolly = value & 0x1FF;
 		break;
 	case 0x010:
-		printf("[Video] write bitmap%d 010: %04X\n", index, value);
-		layer->unk1 = value;
+		printf("[Video] write BM%d_SCREENX: %04X\n", index, value);
+		layer->screenx = value & 0x1FF;
 		break;
 	case 0x018:
-		printf("[Video] write bitmap%d 018: %04X\n", index, value);
-		layer->unk2 = value;
+		printf("[Video] write BM%d_SCREENY: %04X\n", index, value);
+		layer->screeny = value & 0x1FF;
 		break;
 	case 0x020:
-		printf("[Video] write bitmap%d w+unk: %04X\n", index, value);
+		printf("[Video] write BM%d_CLIPWIDTH: %04X\n", index, value);
 		layer->w = value & 0xFF;
-		layer->unk3 = value >> 8;
+		layer->clipx = value >> 8;
 		break;
 	case 0x028:
-		printf("[Video] write bitmap%d h: %04X\n", index, value);
-		layer->h = value;
+		printf("[Video] write BM%d_HEIGHT: %04X\n", index, value);
+		layer->h = value & 0xFF;
 		break;
 	case 0x030:
 		printf("[Video] write bitmap 030: %04X\n", value);
@@ -307,7 +307,7 @@ void bitmap_reg_write16(uint32_t addr, uint16_t value)
 		break;
 	case 0x050:
 		printf("[Video] write bitmap%d 050: %04X\n", index, value);
-		layer->unk4 = value;
+		layer->unk = value;
 		break;
 	default:
 		assert(0);
@@ -363,7 +363,7 @@ void ctrl_write16(uint32_t addr, uint16_t value)
 	case 0x006:
 		if (value & 0x01)
 		{
-			//TODO: display capture
+			vdp.capture_enable = true;
 		}
 
 		//Bit 0 turns on display capture, only log writes to other bits for now

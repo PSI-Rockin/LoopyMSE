@@ -7,6 +7,14 @@
 namespace Video::Renderer
 {
 
+static void write_screen(int index, int x, uint8_t value)
+{
+	if (x < 0x100)
+	{
+		vdp.screens[index][x] = value;
+	}
+}
+
 static void draw_bg(int index, int screen_y)
 {
 	//TODO: how does the tile format register work?
@@ -67,7 +75,49 @@ static void draw_bg(int index, int screen_y)
 		int pal = (palsel >> (pal_descriptor * 4)) & 0xF;
 
 		uint8_t output = tile_data + (pal << 4);
-		vdp.screens[screen_index][screen_x] = output;
+		write_screen(screen_index, screen_x, output);
+	}
+}
+
+static void draw_bitmap(int index, int y)
+{
+	VDP::BitmapRegs* regs = &vdp.bitmap_regs[index];
+
+	if (y < regs->screeny || y > regs->screeny + regs->h)
+	{
+		return;
+	}
+
+	y = y - regs->screeny;
+
+	int start_x = regs->screenx + regs->clipx;
+	int end_x = regs->screenx + regs->w;
+
+	for (int x = start_x; x <= end_x; x++)
+	{
+		int data_x = (regs->scrollx + x) & 0xFF;
+		int data_y = (regs->scrolly + y) & 0x1FF;
+
+		uint32_t addr = data_x + (data_y * (regs->w + 1));
+		uint8_t data = vdp.bitmap[addr & 0x1FFFF];
+
+		if (data)
+		{
+			write_screen(0, x, data);
+		}
+	}
+}
+
+static void display_capture(int y)
+{
+	switch (vdp.capture_ctrl.format)
+	{
+	case 0x03:
+		//Capture screen A before applying the palette
+		memcpy(vdp.capture_buffer, vdp.screens[0], 0x100);
+		break;
+	default:
+		assert(0);
 	}
 }
 
@@ -76,9 +126,23 @@ void draw_scanline(int y)
 	//Set both screens to the backdrop color
 	memset(vdp.screens, 0, sizeof(vdp.screens));
 
+	for (int i = 0; i < 4; i++)
+	{
+		if (vdp.layer_ctrl.bitmap_enable[i])
+		{
+			draw_bitmap(i, y);
+		}
+	}
+
 	if (vdp.layer_ctrl.bg_enable[0])
 	{
 		draw_bg(0, y);
+	}
+
+	if (vdp.capture_enable && y == vdp.capture_ctrl.scanline)
+	{
+		display_capture(y);
+		vdp.capture_enable = false;
 	}
 }
 

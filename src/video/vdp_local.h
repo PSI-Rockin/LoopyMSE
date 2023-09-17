@@ -30,25 +30,19 @@ struct VDP
 	uint16_t hcount;
 	uint16_t vcount;
 	
-	struct Ctrl
-	{
-		int capture_enable;
-		int unk;
-	};
-
-	Ctrl ctrl;
+	int capture_enable;
 
 	//Bitmap registers - 0x0C059xxx
 	struct BitmapRegs
 	{
-		uint16_t x;
-		uint16_t y;
-		uint16_t unk1;
-		uint16_t unk2;
+		uint16_t scrollx;
+		uint16_t scrolly;
+		uint16_t screenx;
+		uint16_t screeny;
 		uint16_t w;
-		uint16_t unk3;
+		uint16_t clipx;
 		uint16_t h;
-		uint16_t unk4;
+		uint16_t unk;
 	};
 
 	BitmapRegs bitmap_regs[4];
