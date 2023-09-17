@@ -6,6 +6,9 @@ namespace Video
 
 struct VDP
 {
+	//Screen A is 0, Screen B is 1
+	uint8_t screens[2][0x100];
+
 	//Bitmap VRAM - 0x0C000000
 	uint8_t bitmap[BITMAP_VRAM_SIZE];
 
@@ -50,6 +53,13 @@ struct VDP
 
 	BitmapRegs bitmap_regs[4];
 	uint16_t bitmap_030, bitmap_040;
+
+	//BG/OBJ registers - 0x0C05Axxx
+	uint16_t bg_format;
+	uint16_t bg_scrollx[2];
+	uint16_t bg_scrolly[2];
+	uint16_t bg_palsel[2];
+	uint16_t bg_tileoffs;
 
 	//Display registers - 0x0C05Bxxx
 

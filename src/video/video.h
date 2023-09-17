@@ -30,6 +30,9 @@ constexpr static int CTRL_REG_END = 0x04059000;
 constexpr static int BITMAP_REG_START = 0x04059000;
 constexpr static int BITMAP_REG_END = 0x0405A000;
 
+constexpr static int BGOBJ_REG_START = 0x0405A000;
+constexpr static int BGOBJ_REG_END = 0x0405B000;
+
 constexpr static int DISPLAY_REG_START = 0x0405B000;
 constexpr static int DISPLAY_REG_END = 0x0405C000;
 
@@ -77,6 +80,14 @@ uint32_t bitmap_reg_read32(uint32_t addr);
 void bitmap_reg_write8(uint32_t addr, uint8_t value);
 void bitmap_reg_write16(uint32_t addr, uint16_t value);
 void bitmap_reg_write32(uint32_t addr, uint32_t value);
+
+uint8_t bgobj_read8(uint32_t addr);
+uint16_t bgobj_read16(uint32_t addr);
+uint32_t bgobj_read32(uint32_t addr);
+
+void bgobj_write8(uint32_t addr, uint8_t value);
+void bgobj_write16(uint32_t addr, uint16_t value);
+void bgobj_write32(uint32_t addr, uint32_t value);
 
 uint8_t display_read8(uint32_t addr);
 uint16_t display_read16(uint32_t addr);

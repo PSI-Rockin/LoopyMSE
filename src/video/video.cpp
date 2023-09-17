@@ -5,6 +5,7 @@
 #include <common/bswp.h>
 #include <core/memory.h>
 #include <core/timing.h>
+#include "video/render.h"
 #include "video/vdp_local.h"
 #include "video/video.h"
 
@@ -25,6 +26,11 @@ struct DumpHeader
 
 static void inc_vcount(uint64_t param, int cycles_late)
 {
+	if (vdp.vcount < 0x0E0)
+	{
+		Renderer::draw_scanline(vdp.vcount);
+	}
+
 	vdp.vcount++;
 	
 	//Once we go past the visible region, enter VSYNC
@@ -372,6 +378,97 @@ void ctrl_write16(uint32_t addr, uint16_t value)
 }
 
 void ctrl_write32(uint32_t addr, uint32_t value)
+{
+	assert(0);
+}
+
+uint8_t bgobj_read8(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+uint16_t bgobj_read16(uint32_t addr)
+{
+	addr &= 0xFFF;
+	switch (addr)
+	{
+	case 0x000:
+		return vdp.bg_format;
+	case 0x002:
+		return vdp.bg_scrollx[0];
+	case 0x004:
+		return vdp.bg_scrolly[0];
+	case 0x006:
+		return vdp.bg_scrollx[1];
+	case 0x008:
+		return vdp.bg_scrolly[1];
+	case 0x00A:
+		return vdp.bg_palsel[0];
+	case 0x00C:
+		return vdp.bg_palsel[1];
+	case 0x020:
+		return vdp.bg_tileoffs;
+	default:
+		assert(0);
+		return 0;
+	}
+}
+
+uint32_t bgobj_read32(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+void bgobj_write8(uint32_t addr, uint8_t value)
+{
+	assert(0);
+}
+
+void bgobj_write16(uint32_t addr, uint16_t value)
+{
+	addr &= 0xFFF;
+	switch (addr)
+	{
+	case 0x000:
+		printf("[Video] write BG_FORMAT: %04X\n", value);
+		vdp.bg_format = value;
+		break;
+	case 0x002:
+	case 0x006:
+	{
+		int index = (addr - 0x002) >> 2;
+		printf("[Video] write BG%d_SCROLLX: %04X\n", index, value);
+		vdp.bg_scrollx[index] = value & 0xFF;
+		break;
+	}
+	case 0x004:
+	case 0x008:
+	{
+		int index = (addr - 0x004) >> 2;
+		printf("[Video] write BG%d_SCROLLY: %04X\n", index, value);
+		vdp.bg_scrolly[index] = value & 0x1FF;
+		break;
+	}
+	case 0x00A:
+	case 0x00C:
+	{
+		int index = (addr - 0x00A) >> 1;
+		printf("[Video] write BG%d_PALSEL: %04X\n", index, value);
+		vdp.bg_palsel[index] = value;
+		break;
+	}
+	case 0x020:
+		printf("[Video] write BG_TILEOFFS: %04X\n", value);
+		vdp.bg_tileoffs = value;
+		break;
+	default:
+		assert(0);
+	}
+}
+
+void bgobj_write32(uint32_t addr, uint32_t value)
 {
 	assert(0);
 }
