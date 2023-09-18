@@ -24,9 +24,52 @@ struct DumpHeader
 	uint32_t data_width;
 };
 
+static void output_bmp()
+{
+	std::ofstream bmp_file("emu_output.bmp", std::ios::binary);
+
+	const char* SIGNATURE = "BM";
+	bmp_file.write(SIGNATURE, 2);
+
+	constexpr static int DATA_SIZE = (DISPLAY_WIDTH * DISPLAY_HEIGHT * 2);
+	uint32_t file_size = DATA_SIZE + 0x36;
+	bmp_file.write((char*)&file_size, 4);
+
+	uint32_t reserved = 0;
+	bmp_file.write((char*)&reserved, 4);
+
+	uint32_t data_offs = 0x36;
+	bmp_file.write((char*)&data_offs, 4);
+
+	uint32_t info_size = 0x28;
+	bmp_file.write((char*)&info_size, 4);
+
+	bmp_file.write((char*)&DISPLAY_WIDTH, 4);
+	bmp_file.write((char*)&DISPLAY_HEIGHT, 4);
+
+	uint16_t planes = 1;
+	bmp_file.write((char*)&planes, 2);
+
+	uint16_t bpp = 16;
+	bmp_file.write((char*)&bpp, 2);
+
+	uint32_t compression = 0;
+	bmp_file.write((char*)&compression, 4);
+	bmp_file.write((char*)&compression, 4);
+	bmp_file.write((char*)&compression, 4);
+	bmp_file.write((char*)&compression, 4);
+	bmp_file.write((char*)&compression, 4);
+	bmp_file.write((char*)&compression, 4);
+
+	for (int y = 0; y < DISPLAY_HEIGHT; y++)
+	{
+		bmp_file.write((char*)vdp.display_output[DISPLAY_HEIGHT - y - 1], DISPLAY_WIDTH * 2);
+	}
+}
+
 static void inc_vcount(uint64_t param, int cycles_late)
 {
-	if (vdp.vcount < 0x0E0)
+	if (vdp.vcount < DISPLAY_HEIGHT)
 	{
 		Renderer::draw_scanline(vdp.vcount);
 	}
@@ -34,22 +77,24 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	vdp.vcount++;
 	
 	//Once we go past the visible region, enter VSYNC
-	//TODO: is 0x1D8 the correct starting value?
-	if (vdp.vcount == 0x0E0)
+	constexpr static int VSYNC_START = 0x1D9;
+	if (vdp.vcount == DISPLAY_HEIGHT)
 	{
 		printf("[Video] VSYNC start\n");
-		vdp.vcount = 0x1D8;
+		vdp.vcount = VSYNC_START;
+		output_bmp();
+		dump_for_serial();
 	}
 
 	//At the end of VSYNC, wrap around to the start of the visible region
-	if (vdp.vcount == 0x200)
+	constexpr static int VSYNC_END = 0x200;
+	if (vdp.vcount == VSYNC_END)
 	{
 		printf("[Video] VSYNC end\n");
 		vdp.vcount = 0;
 	}
 
-	//Based upon the above numbers
-	constexpr static int LINES_PER_FRAME = 0xE0 + (0x200 - 0x1D8);
+	constexpr static int LINES_PER_FRAME = DISPLAY_HEIGHT + (VSYNC_END - VSYNC_START);
 
 	constexpr static int CYCLES_PER_FRAME = Timing::F_CPU / 60;
 	constexpr static int CYCLES_PER_LINE = CYCLES_PER_FRAME / LINES_PER_FRAME;

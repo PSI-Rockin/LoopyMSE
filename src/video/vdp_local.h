@@ -7,7 +7,9 @@ namespace Video
 struct VDP
 {
 	//Screen A is 0, Screen B is 1
-	uint8_t screens[2][0x100];
+	uint8_t screens[2][DISPLAY_WIDTH];
+
+	uint16_t display_output[DISPLAY_HEIGHT][DISPLAY_WIDTH];
 
 	//Bitmap VRAM - 0x0C000000
 	uint8_t bitmap[BITMAP_VRAM_SIZE];

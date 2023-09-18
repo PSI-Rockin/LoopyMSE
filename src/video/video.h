@@ -4,6 +4,9 @@
 namespace Video
 {
 
+constexpr static int DISPLAY_WIDTH = 0x100;
+constexpr static int DISPLAY_HEIGHT = 0xE0;
+
 constexpr static int BITMAP_VRAM_START = 0x04000000;
 constexpr static int BITMAP_VRAM_SIZE = 0x40000;
 constexpr static int BITMAP_VRAM_END = BITMAP_VRAM_START + BITMAP_VRAM_SIZE;

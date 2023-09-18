@@ -9,7 +9,7 @@ namespace Video::Renderer
 
 static void write_screen(int index, int x, uint8_t value)
 {
-	if (x < 0x100)
+	if (x < DISPLAY_WIDTH)
 	{
 		vdp.screens[index][x] = value;
 	}
@@ -18,7 +18,6 @@ static void write_screen(int index, int x, uint8_t value)
 static void draw_bg(int index, int screen_y)
 {
 	//TODO: how does the tile format register work?
-	assert(screen_y < 0xE0);
 	uint8_t* tile_map = vdp.tile;
 
 	for (int screen_x = 0; screen_x < 0x100; screen_x++)
@@ -108,6 +107,17 @@ static void draw_bitmap(int index, int y)
 	}
 }
 
+static void process_color_math(int y)
+{
+	for (int x = 0; x < DISPLAY_WIDTH; x++)
+	{
+		uint16_t color;
+		memcpy(&color, vdp.palette + (vdp.screens[0][x] * 2), 2);
+		
+		vdp.display_output[y][x] = Common::bswp16(color);
+	}
+}
+
 static void display_capture(int y)
 {
 	switch (vdp.capture_ctrl.format)
@@ -138,6 +148,8 @@ void draw_scanline(int y)
 	{
 		draw_bg(0, y);
 	}
+
+	process_color_math(y);
 
 	if (vdp.capture_enable && y == vdp.capture_ctrl.scanline)
 	{
