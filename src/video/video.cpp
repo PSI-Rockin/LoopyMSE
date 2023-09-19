@@ -232,7 +232,7 @@ uint16_t capture_read16(uint32_t addr)
 	addr &= 0x1FF;
 	uint16_t value;
 	memcpy(&value, &vdp.capture_buffer[addr], 2);
-	return value;
+	return Common::bswp16(value);
 }
 
 uint32_t capture_read32(uint32_t addr)
@@ -618,6 +618,108 @@ void display_write16(uint32_t addr, uint16_t value)
 }
 
 void display_write32(uint32_t addr, uint32_t value)
+{
+	assert(0);
+}
+
+uint8_t dma_ctrl_read8(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+uint16_t dma_ctrl_read16(uint32_t addr)
+{
+	addr &= 0xFFF;
+	switch (addr)
+	{
+	case 0x002:
+		return vdp.dma_mask;
+	case 0x004:
+		return vdp.dma_value;
+	default:
+		assert(0);
+		return 0;
+	}
+}
+
+uint32_t dma_ctrl_read32(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+void dma_ctrl_write8(uint32_t addr, uint8_t value)
+{
+	assert(0);
+}
+
+void dma_ctrl_write16(uint32_t addr, uint16_t value)
+{
+	addr &= 0xFFF;
+	switch (addr)
+	{
+	case 0x000:
+		printf("[Video] write dma ctrl 000: %04X\n", value);
+		break;
+	case 0x002:
+		//TODO: what does bit 8 do? Seems to have no effect in HW tests at this time
+		vdp.dma_mask = value & 0x1FF;
+		break;
+	case 0x004:
+		vdp.dma_value = value & 0xFF;
+		break;
+	default:
+		assert(0);
+	}
+}
+
+void dma_ctrl_write32(uint32_t addr, uint32_t value)
+{
+	assert(0);
+}
+
+uint8_t dma_read8(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+uint16_t dma_read16(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+uint32_t dma_read32(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+void dma_write8(uint32_t addr, uint8_t value)
+{
+	assert(0);
+}
+
+void dma_write16(uint32_t addr, uint16_t value)
+{
+	//Value written doesn't matter, it always triggers this
+	//TODO: how long does this take? Is the CPU stalled?
+	addr &= 0x3FF;
+
+	int y = addr >> 1;
+	for (int x = 0; x < DISPLAY_WIDTH; x++)
+	{
+		uint32_t addr = x + (y * DISPLAY_WIDTH);
+		uint8_t data = vdp.bitmap[addr];
+		data &= ~vdp.dma_mask;
+		data |= vdp.dma_value & vdp.dma_mask;
+		vdp.bitmap[addr] = data;
+	}
+}
+
+void dma_write32(uint32_t addr, uint32_t value)
 {
 	assert(0);
 }

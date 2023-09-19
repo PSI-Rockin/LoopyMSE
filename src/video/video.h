@@ -39,6 +39,12 @@ constexpr static int BGOBJ_REG_END = 0x0405B000;
 constexpr static int DISPLAY_REG_START = 0x0405B000;
 constexpr static int DISPLAY_REG_END = 0x0405C000;
 
+constexpr static int DMA_CTRL_START = 0x0405E000;
+constexpr static int DMA_CTRL_END = 0x0405F000;
+
+constexpr static int DMA_START = 0x0405F000;
+constexpr static int DMA_END = 0x04060000;
+
 void initialize();
 void shutdown();
 void dump_for_serial();
@@ -99,5 +105,21 @@ uint32_t display_read32(uint32_t addr);
 void display_write8(uint32_t addr, uint8_t value);
 void display_write16(uint32_t addr, uint16_t value);
 void display_write32(uint32_t addr, uint32_t value);
+
+uint8_t dma_ctrl_read8(uint32_t addr);
+uint16_t dma_ctrl_read16(uint32_t addr);
+uint32_t dma_ctrl_read32(uint32_t addr);
+
+void dma_ctrl_write8(uint32_t addr, uint8_t value);
+void dma_ctrl_write16(uint32_t addr, uint16_t value);
+void dma_ctrl_write32(uint32_t addr, uint32_t value);
+
+uint8_t dma_read8(uint32_t addr);
+uint16_t dma_read16(uint32_t addr);
+uint32_t dma_read32(uint32_t addr);
+
+void dma_write8(uint32_t addr, uint8_t value);
+void dma_write16(uint32_t addr, uint16_t value);
+void dma_write32(uint32_t addr, uint32_t value);
 
 }

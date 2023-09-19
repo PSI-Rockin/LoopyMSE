@@ -81,6 +81,10 @@ struct VDP
 	};
 
 	CaptureCtrl capture_ctrl;
+
+	//DMA ctrl registers - 0x0C05Exxx
+	uint16_t dma_mask;
+	uint16_t dma_value;
 };
 
 extern VDP vdp;

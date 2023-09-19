@@ -136,7 +136,7 @@ void draw_scanline(int y)
 	//Set both screens to the backdrop color
 	memset(vdp.screens, 0, sizeof(vdp.screens));
 
-	for (int i = 0; i < 4; i++)
+	for (int i = 3; i >= 0; i--)
 	{
 		if (vdp.layer_ctrl.bitmap_enable[i])
 		{

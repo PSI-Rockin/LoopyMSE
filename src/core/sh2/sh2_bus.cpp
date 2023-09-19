@@ -37,6 +37,10 @@ static uint32_t translate_addr(uint32_t addr)
 		return Video::bgobj_##access(__VA_ARGS__);							\
 	if (addr >= Video::DISPLAY_REG_START && addr < Video::DISPLAY_REG_END)	\
 		return Video::display_##access(__VA_ARGS__);						\
+	if (addr >= Video::DMA_CTRL_START && addr < Video::DMA_CTRL_END)		\
+		return Video::dma_ctrl_##access(__VA_ARGS__);						\
+	if (addr >= Video::DMA_START && addr < Video::DMA_END)					\
+		return Video::dma_##access(__VA_ARGS__);							\
 	if (addr >= OCPM::BASE_ADDR && addr < OCPM::END_ADDR)					\
 		return OCPM::##access(__VA_ARGS__);									\
 	return unmapped_##access(__VA_ARGS__);
