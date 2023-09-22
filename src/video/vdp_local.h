@@ -44,11 +44,12 @@ struct VDP
 		uint16_t w;
 		uint16_t clipx;
 		uint16_t h;
-		uint16_t unk;
+		uint16_t outline_color;
 	};
 
 	BitmapRegs bitmap_regs[4];
-	uint16_t bitmap_030, bitmap_040;
+	uint16_t bitmap_ctrl;
+	uint16_t bitmap_palsel;
 
 	//BG/OBJ registers - 0x0C05Axxx
 	uint16_t bg_format;
@@ -59,20 +60,30 @@ struct VDP
 
 	//Display registers - 0x0C05Bxxx
 
-	uint16_t display_000;
+	uint16_t dispmode;
 	
 	struct LayerCtrl
 	{
 		int bg_enable[2];
 		int bitmap_enable[4];
 		int obj_enable[2];
-		int unk;
+		int bitmap_screen_mode[2];
+		int obj_screen_mode[2];
 	};
 
 	LayerCtrl layer_ctrl;
-	uint16_t display_004;
-	uint16_t master_brightness;
-	uint16_t display_008;
+
+	struct ColorPrio
+	{
+		int prio_mode;
+		int screen_b_backdrop_only;
+		int output_screen_b;
+		int output_screen_a;
+		int blend_mode;
+	};
+
+	ColorPrio color_prio;
+	uint16_t backdrops[2];
 
 	struct CaptureCtrl
 	{

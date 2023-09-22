@@ -285,11 +285,11 @@ uint16_t bitmap_reg_read16(uint32_t addr)
 	case 0x028:
 		return layer->h;
 	case 0x030:
-		return vdp.bitmap_030;
+		return vdp.bitmap_ctrl;
 	case 0x040:
-		return vdp.bitmap_040;
+		return vdp.bitmap_palsel;
 	case 0x050:
-		return layer->unk;
+		return layer->outline_color;
 	default:
 		assert(0);
 		return 0;
@@ -343,16 +343,16 @@ void bitmap_reg_write16(uint32_t addr, uint16_t value)
 		layer->h = value & 0xFF;
 		break;
 	case 0x030:
-		printf("[Video] write bitmap 030: %04X\n", value);
-		vdp.bitmap_030 = value;
+		printf("[Video] write BM_CTRL: %04X\n", value);
+		vdp.bitmap_ctrl = value;
 		break;
 	case 0x040:
-		printf("[Video] write bitmap 040: %04X\n", value);
-		vdp.bitmap_040 = value;
+		printf("[Video] write BM_PALSEL: %04X\n", value);
+		vdp.bitmap_palsel = value;
 		break;
 	case 0x050:
-		printf("[Video] write bitmap%d 050: %04X\n", index, value);
-		layer->unk = value;
+		printf("[Video] write BM%d_OUTLINE_COLOR: %04X\n", index, value);
+		layer->outline_color = value;
 		break;
 	default:
 		assert(0);
@@ -504,6 +504,9 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 		vdp.bg_palsel[index] = value;
 		break;
 	}
+	case 0x010:
+		printf("[Video] write OBJ_CTRL: %04X\n", value);
+		break;
 	case 0x020:
 		printf("[Video] write BG_TILEOFFS: %04X\n", value);
 		vdp.bg_tileoffs = value;
@@ -530,7 +533,7 @@ uint16_t display_read16(uint32_t addr)
 	switch (addr)
 	{
 	case 0x000:
-		return vdp.display_000;
+		return vdp.dispmode;
 	case 0x002:
 	{
 		uint16_t result = 0;
@@ -546,15 +549,26 @@ uint16_t display_read16(uint32_t addr)
 			result |= vdp.layer_ctrl.bitmap_enable[i] << (i + 2);
 		}
 
-		result |= vdp.layer_ctrl.unk << 8;
+		result |= vdp.layer_ctrl.bitmap_screen_mode[0] << 8;
+		result |= vdp.layer_ctrl.bitmap_screen_mode[1] << 10;
+		result |= vdp.layer_ctrl.obj_screen_mode[0] << 12;
+		result |= vdp.layer_ctrl.obj_screen_mode[1] << 14;
 		return result;
 	}
 	case 0x004:
-		return vdp.display_004;
+	{
+		uint16_t result = vdp.color_prio.prio_mode;
+		result |= vdp.color_prio.screen_b_backdrop_only << 4;
+		result |= vdp.color_prio.output_screen_b << 5;
+		result |= vdp.color_prio.output_screen_a << 6;
+		result |= vdp.color_prio.blend_mode << 7;
+		return result;
+	}
 	case 0x006:
-		return vdp.master_brightness;
+		//Note the reversed order!
+		return vdp.backdrops[1];
 	case 0x008:
-		return vdp.display_008;
+		return vdp.backdrops[0];
 	default:
 		assert(0);
 		return 0;
@@ -578,8 +592,8 @@ void display_write16(uint32_t addr, uint16_t value)
 	switch (addr)
 	{
 	case 0x000:
-		vdp.display_000 = value;
-		printf("[Video] write display 000: %04X\n", value);
+		vdp.dispmode = value & 0x7;
+		printf("[Video] write DISPMODE: %04X\n", value);
 		break;
 	case 0x002:
 		for (int i = 0; i < 2; i++)
@@ -593,20 +607,26 @@ void display_write16(uint32_t addr, uint16_t value)
 			vdp.layer_ctrl.bitmap_enable[i] = (value >> (i + 2)) & 0x1;
 		}
 
-		vdp.layer_ctrl.unk = value >> 8;
-		printf("[Video] write layer ctrl: %04X\n", value);
+		vdp.layer_ctrl.bitmap_screen_mode[0] = (value >> 8) & 0x3;
+		vdp.layer_ctrl.bitmap_screen_mode[1] = (value >> 10) & 0x3;
+		vdp.layer_ctrl.obj_screen_mode[0] = (value >> 12) & 0x3;
+		vdp.layer_ctrl.obj_screen_mode[1] = value >> 14;
+		printf("[Video] write LAYER_CTRL: %04X\n", value);
 		break;
 	case 0x004:
-		vdp.display_004 = value;
-		printf("[Video] write display 004: %04X\n", value);
+		vdp.color_prio.prio_mode = value & 0xF;
+		vdp.color_prio.screen_b_backdrop_only = (value >> 4) & 0x1;
+		vdp.color_prio.output_screen_b = (value >> 5) & 0x1;
+		vdp.color_prio.output_screen_a = (value >> 6) & 0x1;
+		vdp.color_prio.blend_mode = (value >> 7) & 0x1;
+		printf("[Video] write COLORPRIO: %04X\n", value);
 		break;
 	case 0x006:
-		vdp.master_brightness = value;
-		printf("[Video] write master brightness: %04X\n", value);
+		//Note the reversed order!
+		vdp.backdrops[1] = value;
 		break;
 	case 0x008:
-		vdp.display_008 = value;
-		printf("[Video] write display 008: %04X\n", value);
+		vdp.backdrops[0] = value;
 		break;
 	case 0x00A:
 		vdp.capture_ctrl.scanline = value & 0xFF;

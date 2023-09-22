@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <common/bswp.h>
@@ -6,6 +7,29 @@
 
 namespace Video::Renderer
 {
+
+static uint16_t read_screen(int index, int x)
+{
+	if (index == 0 && !vdp.color_prio.output_screen_a)
+	{
+		return 0;
+	}
+
+	if (index == 1 && !vdp.color_prio.output_screen_b)
+	{
+		return 0;
+	}
+
+	uint8_t pal_color = vdp.screens[index][x];
+	if (!pal_color || (index == 1 && vdp.color_prio.screen_b_backdrop_only))
+	{
+		return vdp.backdrops[index];
+	}
+
+	uint16_t color;
+	memcpy(&color, vdp.palette + (pal_color * 2), 2);
+	return Common::bswp16(color);
+}
 
 static void write_screen(int index, int x, uint8_t value)
 {
@@ -100,7 +124,20 @@ static void draw_bitmap(int index, int y)
 		uint32_t addr = data_x + (data_y * (regs->w + 1));
 		uint8_t data = vdp.bitmap[addr & 0x1FFFF];
 
-		if (data)
+		int pair_index = index >> 1;
+		int output_mode = vdp.layer_ctrl.bitmap_screen_mode[pair_index];
+
+		if (!data)
+		{
+			continue;
+		}
+
+		if (output_mode & 0x1)
+		{
+			write_screen(1, x, data);
+		}
+
+		if (output_mode & 0x2)
 		{
 			write_screen(0, x, data);
 		}
@@ -111,10 +148,40 @@ static void process_color_math(int y)
 {
 	for (int x = 0; x < DISPLAY_WIDTH; x++)
 	{
-		uint16_t color;
-		memcpy(&color, vdp.palette + (vdp.screens[0][x] * 2), 2);
-		
-		vdp.display_output[y][x] = Common::bswp16(color);
+		uint16_t input_a = read_screen(0, x);
+		uint16_t input_b = read_screen(1, x);
+
+		int a_r = (input_a >> 10) & 0x1F;
+		int a_g = (input_a >> 5) & 0x1F;
+		int a_b = input_a & 0x1F;
+
+		int b_r = (input_b >> 10) & 0x1F;
+		int b_g = (input_b >> 5) & 0x1F;
+		int b_b = input_b & 0x1F;
+
+		int out_r, out_g, out_b;
+
+		if (vdp.color_prio.blend_mode)
+		{
+			//Subtractive blending
+			out_r = a_r - b_r;
+			out_g = a_g - b_g;
+			out_b = a_b - b_b;
+		}
+		else
+		{
+			//Additive blending
+			out_r = a_r + b_r;
+			out_g = a_g + b_g;
+			out_b = a_b + b_b;
+		}
+
+		out_r = std::clamp(out_r, 0, 0x1F);
+		out_g = std::clamp(out_g, 0, 0x1F);
+		out_b = std::clamp(out_b, 0, 0x1F);
+
+		uint16_t output = (out_r << 10) | (out_g << 5) | out_b;
+		vdp.display_output[y][x] = output;
 	}
 }
 
