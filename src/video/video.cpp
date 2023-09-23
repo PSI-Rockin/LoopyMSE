@@ -24,9 +24,9 @@ struct DumpHeader
 	uint32_t data_width;
 };
 
-static void output_bmp()
+static void dump_bmp(std::string name, std::unique_ptr<uint16_t[]>& data)
 {
-	std::ofstream bmp_file("emu_output.bmp", std::ios::binary);
+	std::ofstream bmp_file(name + ".bmp", std::ios::binary);
 
 	const char* SIGNATURE = "BM";
 	bmp_file.write(SIGNATURE, 2);
@@ -63,8 +63,34 @@ static void output_bmp()
 
 	for (int y = 0; y < DISPLAY_HEIGHT; y++)
 	{
-		bmp_file.write((char*)vdp.display_output[DISPLAY_HEIGHT - y - 1], DISPLAY_WIDTH * 2);
+		int flipped_y = DISPLAY_HEIGHT - y - 1;
+		bmp_file.write((char*)(data.get() + flipped_y * DISPLAY_WIDTH), DISPLAY_WIDTH * 2);
 	}
+}
+
+static void dump_all_bmps()
+{
+	for (int i = 0; i < 4; i++)
+	{
+		char num = '0' + i;
+
+		std::string bitmap_name = "output_bitmap";
+		dump_bmp(bitmap_name + num, vdp.bitmap_output[i]);
+	}
+
+	for (int i = 0; i < 2; i++)
+	{
+		char num = '0' + i;
+
+		std::string bg_name = "output_bg";
+		dump_bmp(bg_name + num, vdp.bg_output[i]);
+
+		std::string screen_name = "output_screen_";
+		screen_name += (i == 1) ? 'B' : 'A';
+		dump_bmp(screen_name, vdp.screen_output[i]);
+	}
+
+	dump_bmp("output_display", vdp.display_output);
 }
 
 static void inc_vcount(uint64_t param, int cycles_late)
@@ -82,7 +108,7 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	{
 		printf("[Video] VSYNC start\n");
 		vdp.vcount = VSYNC_START;
-		output_bmp();
+		dump_all_bmps();
 		dump_for_serial();
 	}
 
@@ -118,14 +144,29 @@ void initialize()
 {
 	vdp = {};
 
-	vcount_func = Timing::register_func("Video::inc_vcount", inc_vcount);
+	//Initialize output buffers
+	for (int i = 0; i < 2; i++)
+	{
+		vdp.bg_output[i] = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
+		vdp.obj_output[i] = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
+		vdp.screen_output[i] = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
+	}
 
-	//Kickstart the VCOUNT event
-	inc_vcount(0, 0);
+	for (int i = 0; i < 4; i++)
+	{
+		vdp.bitmap_output[i] = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
+	}
+
+	vdp.display_output = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
 
 	//Map VRAM to the CPU
 	Memory::map_sh2_pagetable(vdp.bitmap, BITMAP_VRAM_START, BITMAP_VRAM_SIZE);
 	Memory::map_sh2_pagetable(vdp.tile, TILE_VRAM_START, TILE_VRAM_SIZE);
+
+	vcount_func = Timing::register_func("Video::inc_vcount", inc_vcount);
+
+	//Kickstart the VCOUNT event
+	inc_vcount(0, 0);
 }
 
 void shutdown()

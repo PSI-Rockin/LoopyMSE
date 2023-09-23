@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include "video/video.h"
 
 namespace Video
@@ -6,10 +7,15 @@ namespace Video
 
 struct VDP
 {
+	//16-bit color output of the layers, screens, and final image to be displayed
+	std::unique_ptr<uint16_t[]> bg_output[2];
+	std::unique_ptr<uint16_t[]> bitmap_output[4];
+	std::unique_ptr<uint16_t[]> obj_output[2];
+	std::unique_ptr<uint16_t[]> screen_output[2];
+	std::unique_ptr<uint16_t[]> display_output;
+
 	//Screen A is 0, Screen B is 1
 	uint8_t screens[2][DISPLAY_WIDTH];
-
-	uint16_t display_output[DISPLAY_HEIGHT][DISPLAY_WIDTH];
 
 	//Bitmap VRAM - 0x0C000000
 	uint8_t bitmap[BITMAP_VRAM_SIZE];

@@ -8,27 +8,22 @@
 namespace Video::Renderer
 {
 
+static uint16_t read_palette(uint8_t value)
+{
+	uint16_t color;
+	memcpy(&color, vdp.palette + (value * 2), 2);
+	return Common::bswp16(color);
+}
+
 static uint16_t read_screen(int index, int x)
 {
-	if (index == 0 && !vdp.color_prio.output_screen_a)
-	{
-		return 0;
-	}
-
-	if (index == 1 && !vdp.color_prio.output_screen_b)
-	{
-		return 0;
-	}
-
 	uint8_t pal_color = vdp.screens[index][x];
 	if (!pal_color || (index == 1 && vdp.color_prio.screen_b_backdrop_only))
 	{
 		return vdp.backdrops[index];
 	}
 
-	uint16_t color;
-	memcpy(&color, vdp.palette + (pal_color * 2), 2);
-	return Common::bswp16(color);
+	return read_palette(pal_color);
 }
 
 static void write_screen(int index, int x, uint8_t value)
@@ -37,6 +32,17 @@ static void write_screen(int index, int x, uint8_t value)
 	{
 		vdp.screens[index][x] = value;
 	}
+}
+
+static void write_color(std::unique_ptr<uint16_t[]>& buffer, int x, int y, uint16_t value)
+{
+	buffer[x + (y * DISPLAY_WIDTH)] = value;
+}
+
+static void write_pal_color(std::unique_ptr<uint16_t[]>& buffer, int x, int y, uint8_t pal_index)
+{
+	uint16_t color = read_palette(pal_index);
+	write_color(buffer, x, y, color);
 }
 
 static void draw_bg(int index, int screen_y)
@@ -98,6 +104,7 @@ static void draw_bg(int index, int screen_y)
 		int pal = (palsel >> (pal_descriptor * 4)) & 0xF;
 
 		uint8_t output = tile_data + (pal << 4);
+		write_pal_color(vdp.bg_output[index], screen_x, screen_y, output);
 		write_screen(screen_index, screen_x, output);
 	}
 }
@@ -132,6 +139,8 @@ static void draw_bitmap(int index, int y)
 			continue;
 		}
 
+		write_pal_color(vdp.bitmap_output[index], x, y + regs->screeny, data);
+
 		if (output_mode & 0x1)
 		{
 			write_screen(1, x, data);
@@ -148,8 +157,18 @@ static void process_color_math(int y)
 {
 	for (int x = 0; x < DISPLAY_WIDTH; x++)
 	{
-		uint16_t input_a = read_screen(0, x);
-		uint16_t input_b = read_screen(1, x);
+		uint16_t input_a = 0, input_b = 0;
+		if (vdp.color_prio.output_screen_a)
+		{
+			input_a = read_screen(0, x);
+			write_color(vdp.screen_output[0], x, y, input_a);
+		}
+
+		if (vdp.color_prio.output_screen_b)
+		{
+			input_b = read_screen(1, x);
+			write_color(vdp.screen_output[1], x, y, input_b);
+		}
 
 		int a_r = (input_a >> 10) & 0x1F;
 		int a_g = (input_a >> 5) & 0x1F;
@@ -181,7 +200,7 @@ static void process_color_math(int y)
 		out_b = std::clamp(out_b, 0, 0x1F);
 
 		uint16_t output = (out_r << 10) | (out_g << 5) | out_b;
-		vdp.display_output[y][x] = output;
+		write_color(vdp.display_output, x, y, output);
 	}
 }
 
@@ -200,6 +219,20 @@ static void display_capture(int y)
 
 void draw_scanline(int y)
 {
+	//Clear the output buffers
+	constexpr static int LINE_SIZE = DISPLAY_WIDTH * 2;
+	int offs = y * DISPLAY_WIDTH;
+	for (int i = 0; i < 2; i++)
+	{
+		memset(vdp.bg_output[i].get() + offs, 0, LINE_SIZE);
+		memset(vdp.obj_output[i].get() + offs, 0, LINE_SIZE);
+		memset(vdp.bitmap_output[i].get() + offs, 0, LINE_SIZE);
+		memset(vdp.bitmap_output[i + 2].get() + offs, 0, LINE_SIZE);
+		memset(vdp.screen_output[i].get() + offs, 0, LINE_SIZE);
+	}
+
+	memset(vdp.display_output.get() + offs, 0, LINE_SIZE);
+
 	//Set both screens to the backdrop color
 	memset(vdp.screens, 0, sizeof(vdp.screens));
 
