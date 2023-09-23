@@ -28,6 +28,7 @@ static uint16_t read_screen(int index, int x)
 
 static void write_screen(int index, int x, uint8_t value)
 {
+	x &= 0x1FF;
 	if (x < DISPLAY_WIDTH)
 	{
 		vdp.screens[index][x] = value;
@@ -36,7 +37,11 @@ static void write_screen(int index, int x, uint8_t value)
 
 static void write_color(std::unique_ptr<uint16_t[]>& buffer, int x, int y, uint16_t value)
 {
-	buffer[x + (y * DISPLAY_WIDTH)] = value;
+	x &= 0x1FF;
+	if (x < DISPLAY_WIDTH)
+	{
+		buffer[x + (y * DISPLAY_WIDTH)] = value;
+	}
 }
 
 static void write_pal_color(std::unique_ptr<uint16_t[]>& buffer, int x, int y, uint8_t pal_index)
@@ -47,6 +52,11 @@ static void write_pal_color(std::unique_ptr<uint16_t[]>& buffer, int x, int y, u
 
 static void draw_bg(int index, int screen_y)
 {
+	if (!vdp.layer_ctrl.bg_enable[index])
+	{
+		return;
+	}
+
 	//TODO: how does the tile format register work?
 	uint8_t* tile_map = vdp.tile;
 
@@ -111,6 +121,11 @@ static void draw_bg(int index, int screen_y)
 
 static void draw_bitmap(int index, int y)
 {
+	if (!vdp.layer_ctrl.bitmap_enable[index])
+	{
+		return;
+	}
+
 	VDP::BitmapRegs* regs = &vdp.bitmap_regs[index];
 
 	if (y < regs->screeny || y > regs->screeny + regs->h)
@@ -151,6 +166,16 @@ static void draw_bitmap(int index, int y)
 			write_screen(0, x, data);
 		}
 	}
+}
+
+static void draw_obj(int index, int y)
+{
+	if (!vdp.layer_ctrl.obj_enable[index])
+	{
+		return;
+	}
+
+	//TODO
 }
 
 static void process_color_math(int y)
@@ -236,17 +261,53 @@ void draw_scanline(int y)
 	//Set both screens to the backdrop color
 	memset(vdp.screens, 0, sizeof(vdp.screens));
 
-	for (int i = 3; i >= 0; i--)
+	//Draw each layer
+	//The order is important - each layer has a different priority, and lower priority layers are drawn first here
+	int bitmap_prio = vdp.color_prio.prio_mode & 0x1;
+	int bg0_prio = (vdp.color_prio.prio_mode >> 1) & 0x1;
+	int obj0_prio = vdp.color_prio.prio_mode >> 2;
+
+	int bitmap_low = (bitmap_prio == 1) ? 0 : 2;
+	int bitmap_hi = (bitmap_low + 2) & 0x3;
+
+	if (obj0_prio == 3)
 	{
-		if (vdp.layer_ctrl.bitmap_enable[i])
-		{
-			draw_bitmap(i, y);
-		}
+		draw_obj(0, y);
 	}
 
-	if (vdp.layer_ctrl.bg_enable[0])
+	draw_bg(1, y);
+
+	if (!bg0_prio)
 	{
 		draw_bg(0, y);
+	}
+
+	if (obj0_prio == 2)
+	{
+		draw_obj(0, y);
+	}
+
+	draw_bitmap(bitmap_low + 1, y);
+	draw_bitmap(bitmap_low, y);
+
+	if (obj0_prio == 1)
+	{
+		draw_obj(0, y);
+	}
+
+	draw_bitmap(bitmap_hi + 1, y);
+	draw_bitmap(bitmap_hi, y);
+
+	if (bg0_prio)
+	{
+		draw_bg(0, y);
+	}
+
+	draw_obj(1, y);
+
+	if (obj0_prio == 0)
+	{
+		draw_obj(0, y);
 	}
 
 	process_color_math(y);
