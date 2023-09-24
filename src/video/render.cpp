@@ -151,16 +151,17 @@ static void draw_bg(int index, int screen_y)
 
 		tile_index += tile_y & ~0x7;
 		tile_index += tile_x >> 3;
-		uint32_t offs = data_start + (tile_x & 0x7) + ((tile_y & 0x7) * 0x08) + (tile_index << 6);
+		uint32_t offs = (tile_x & 0x7) + ((tile_y & 0x7) * 0x08) + (tile_index << 6);
 
 		uint8_t tile_data;
 		if (is_8bit)
 		{
-			tile_data = vdp.tile[offs & 0xFFFF];
+			tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
 		}
 		else
 		{
-			tile_data = vdp.tile[(offs >> 1) & 0xFFFF];
+			offs >>= 1;
+			tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
 			if (tile_x & 0x1)
 			{
 				tile_data &= 0xF;
