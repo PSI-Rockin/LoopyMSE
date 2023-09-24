@@ -12,8 +12,8 @@
 namespace Video
 {
 
-static Timing::FuncHandle vcount_func;
-static Timing::EventHandle vcount_ev;
+static Timing::FuncHandle vcount_func, hsync_func;
+static Timing::EventHandle vcount_ev, hsync_ev;
 
 VDP vdp;
 
@@ -93,8 +93,15 @@ static void dump_all_bmps()
 	dump_bmp("output_display", vdp.display_output);
 }
 
+static void start_hsync(uint64_t param, int cycles_late)
+{
+	vdp.hcount |= 0x100;
+}
+
 static void inc_vcount(uint64_t param, int cycles_late)
 {
+	//Leave HSYNC
+	vdp.hcount &= ~0x100;
 	if (vdp.vcount < DISPLAY_HEIGHT)
 	{
 		Renderer::draw_scanline(vdp.vcount);
@@ -124,9 +131,13 @@ static void inc_vcount(uint64_t param, int cycles_late)
 
 	constexpr static int CYCLES_PER_FRAME = Timing::F_CPU / 60;
 	constexpr static int CYCLES_PER_LINE = CYCLES_PER_FRAME / LINES_PER_FRAME;
+	constexpr static int CYCLES_UNTIL_HSYNC = (CYCLES_PER_LINE * 256.0f) / 341.25f;
 
-	Timing::UnitCycle sched_cycles = Timing::convert_cpu(CYCLES_PER_LINE - cycles_late);
-	vcount_ev = Timing::add_event(vcount_func, sched_cycles, 0, Timing::CPU_TIMER);
+	Timing::UnitCycle scanline_cycles = Timing::convert_cpu(CYCLES_PER_LINE - cycles_late);
+	vcount_ev = Timing::add_event(vcount_func, scanline_cycles, 0, Timing::CPU_TIMER);
+
+	Timing::UnitCycle hsync_cycles = Timing::convert_cpu(CYCLES_UNTIL_HSYNC - cycles_late);
+	hsync_ev = Timing::add_event(hsync_func, hsync_cycles, 0, Timing::CPU_TIMER);
 }
 
 static void dump_serial_region(std::ofstream& dump, uint8_t* mem, uint32_t addr, uint32_t length)
@@ -164,6 +175,7 @@ void initialize()
 	Memory::map_sh2_pagetable(vdp.tile, TILE_VRAM_START, TILE_VRAM_SIZE);
 
 	vcount_func = Timing::register_func("Video::inc_vcount", inc_vcount);
+	hsync_func = Timing::register_func("Video::start_hsync", start_hsync);
 
 	//Kickstart the VCOUNT event
 	inc_vcount(0, 0);
@@ -419,6 +431,9 @@ uint16_t ctrl_read16(uint32_t addr)
 	case 0x000:
 		printf("[Video] read ctrl 000\n");
 		return 0;
+	case 0x002:
+		//FIXME: This only reflects HSYNC status, it doesn't actually return the horizontal counter
+		return vdp.hcount;
 	case 0x004:
 		return vdp.vcount;
 	default:
@@ -500,6 +515,12 @@ uint16_t bgobj_read16(uint32_t addr)
 		return vdp.bg_palsel[0];
 	case 0x00C:
 		return vdp.bg_palsel[1];
+	case 0x010:
+		return vdp.obj_ctrl;
+	case 0x012:
+		return vdp.obj_palsel[0];
+	case 0x014:
+		return vdp.obj_palsel[1];
 	case 0x020:
 		return vdp.bg_tileoffs;
 	default:
@@ -560,7 +581,16 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 	}
 	case 0x010:
 		printf("[Video] write OBJ_CTRL: %04X\n", value);
+		vdp.obj_ctrl = value;
 		break;
+	case 0x012:
+	case 0x014:
+	{
+		int index = (addr - 0x012) >> 1;
+		printf("[Video] write OBJ%d_PALSEL: %04X\n", index, value);
+		vdp.obj_palsel[index] = value;
+		break;
+	}
 	case 0x020:
 		printf("[Video] write BG_TILEOFFS: %04X\n", value);
 		vdp.bg_tileoffs = value & 0xFF;

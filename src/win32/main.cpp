@@ -6,7 +6,7 @@ int main()
 {
 	Config::SystemInfo config = {};
 
-	std::ifstream cart_file("D:/nigaoe_artist_be.bin", std::ios::binary);
+	std::ifstream cart_file("D:/anime_land_be.bin", std::ios::binary);
 	if (!cart_file.is_open())
 	{
 		return 1;

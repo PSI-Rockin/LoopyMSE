@@ -73,6 +73,9 @@ struct VDP
 	uint16_t bg_palsel[2];
 	uint16_t bg_tileoffs;
 
+	uint16_t obj_ctrl;
+	uint16_t obj_palsel[2];
+
 	//Display registers - 0x0C05Bxxx
 
 	uint16_t dispmode;

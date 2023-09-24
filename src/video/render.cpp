@@ -215,7 +215,7 @@ static void draw_bitmap(int index, int y)
 		int data_x = (regs->scrollx + x) & 0xFF;
 		int data_y = (regs->scrolly + y) & 0x1FF;
 
-		uint32_t addr = data_x + (data_y * (regs->w + 1));
+		uint32_t addr = data_x + (data_y * 256);
 		uint8_t data = vdp.bitmap[addr & 0x1FFFF];
 
 		int pair_index = index >> 1;
