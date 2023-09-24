@@ -58,7 +58,16 @@ struct VDP
 	uint16_t bitmap_palsel;
 
 	//BG/OBJ registers - 0x0C05Axxx
-	uint16_t bg_format;
+	struct BgCtrl
+	{
+		int shared_maps;
+		int map_size;
+		int bg0_8bit;
+		int tile_size0;
+		int tile_size1;
+	};
+
+	BgCtrl bg_ctrl;
 	uint16_t bg_scrollx[2];
 	uint16_t bg_scrolly[2];
 	uint16_t bg_palsel[2];

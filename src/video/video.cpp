@@ -480,7 +480,14 @@ uint16_t bgobj_read16(uint32_t addr)
 	switch (addr)
 	{
 	case 0x000:
-		return vdp.bg_format;
+	{
+		uint16_t result = vdp.bg_ctrl.shared_maps;
+		result |= vdp.bg_ctrl.map_size << 1;
+		result |= vdp.bg_ctrl.bg0_8bit << 3;
+		result |= vdp.bg_ctrl.tile_size1 << 4;
+		result |= vdp.bg_ctrl.tile_size0 << 6;
+		return result;
+	}
 	case 0x002:
 		return vdp.bg_scrollx[0];
 	case 0x004:
@@ -518,15 +525,21 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 	switch (addr)
 	{
 	case 0x000:
-		printf("[Video] write BG_FORMAT: %04X\n", value);
-		vdp.bg_format = value;
+		printf("[Video] write BG_CTRL: %04X\n", value);
+		vdp.bg_ctrl.shared_maps = value & 0x1;
+		vdp.bg_ctrl.map_size = (value >> 1) & 0x3;
+		vdp.bg_ctrl.bg0_8bit = (value >> 3) & 0x1;
+
+		//Note the reversed order!
+		vdp.bg_ctrl.tile_size1 = (value >> 4) & 0x3;
+		vdp.bg_ctrl.tile_size0 = (value >> 6) & 0x3;
 		break;
 	case 0x002:
 	case 0x006:
 	{
 		int index = (addr - 0x002) >> 2;
 		printf("[Video] write BG%d_SCROLLX: %04X\n", index, value);
-		vdp.bg_scrollx[index] = value & 0xFF;
+		vdp.bg_scrollx[index] = value & 0xFFF;
 		break;
 	}
 	case 0x004:
@@ -534,7 +547,7 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 	{
 		int index = (addr - 0x004) >> 2;
 		printf("[Video] write BG%d_SCROLLY: %04X\n", index, value);
-		vdp.bg_scrolly[index] = value & 0x1FF;
+		vdp.bg_scrolly[index] = value & 0xFFF;
 		break;
 	}
 	case 0x00A:
@@ -550,7 +563,7 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 		break;
 	case 0x020:
 		printf("[Video] write BG_TILEOFFS: %04X\n", value);
-		vdp.bg_tileoffs = value;
+		vdp.bg_tileoffs = value & 0xFF;
 		break;
 	default:
 		assert(0);

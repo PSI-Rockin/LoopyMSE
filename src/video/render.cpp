@@ -50,6 +50,29 @@ static void write_pal_color(std::unique_ptr<uint16_t[]>& buffer, int x, int y, u
 	write_color(buffer, x, y, color);
 }
 
+static int get_bg_tile_size(int index)
+{
+	int tile_size = (index == 0) ? vdp.bg_ctrl.tile_size0 : vdp.bg_ctrl.tile_size1;
+	switch (tile_size)
+	{
+	case 0x00:
+		tile_size = 8;
+		break;
+	case 0x01:
+		tile_size = 16;
+		break;
+	case 0x02:
+		tile_size = 32;
+		break;
+	case 0x03:
+		tile_size = 64;
+		break;
+	default:
+		assert(0);
+	}
+	return tile_size;
+}
+
 static void draw_bg(int index, int screen_y)
 {
 	if (!vdp.layer_ctrl.bg_enable[index])
@@ -57,19 +80,55 @@ static void draw_bg(int index, int screen_y)
 		return;
 	}
 
-	//TODO: how does the tile format register work?
-	uint8_t* tile_map = vdp.tile;
+	bool is_8bit = index == 0 && vdp.bg_ctrl.bg0_8bit;
+	int tile_size = get_bg_tile_size(index);
+	int tile_size_mask = tile_size - 1;
+
+	int tilemap_width = 0, tilemap_height = 0;
+	switch (vdp.bg_ctrl.map_size)
+	{
+	case 0x00:
+		tilemap_width = 64;
+		tilemap_height = 64;
+		break;
+	case 0x01:
+		tilemap_width = 64;
+		tilemap_height = 32;
+		break;
+	case 0x02:
+		tilemap_width = 32;
+		tilemap_height = 64;
+		break;
+	case 0x03:
+		tilemap_width = 32;
+		tilemap_height = 32;
+		break;
+	default:
+		assert(0);
+	}
+
+	uint32_t map_start;
+	uint32_t data_start = tilemap_width * tilemap_height;
+	if (!vdp.bg_ctrl.shared_maps)
+	{
+		map_start = (index == 1) ? data_start : 0;
+		data_start <<= 2;
+	}
+	else
+	{
+		map_start = 0;
+		data_start <<= 1;
+	}
 
 	for (int screen_x = 0; screen_x < 0x100; screen_x++)
 	{
-		int x = (screen_x + vdp.bg_scrollx[index]) & 0xFF;
-		int y = (screen_y + vdp.bg_scrolly[index]) & 0x1FF;
+		int x = (screen_x + vdp.bg_scrollx[index]) & ((tilemap_width * 8) - 1);
+		int y = (screen_y + vdp.bg_scrolly[index]) & ((tilemap_height * 8) - 1);
 
-		uint16_t* tile_map = (uint16_t*)vdp.tile;
-		tile_map += (x >> 3) + ((y >> 3) * 0x20);
+		uint16_t map_addr = map_start + ((x / tile_size) + ((y / tile_size) * tilemap_width));
 
 		uint16_t descriptor;
-		memcpy(&descriptor, tile_map, 2);
+		memcpy(&descriptor, &vdp.tile[map_addr * 2], 2);
 		descriptor = Common::bswp16(descriptor);
 
 		uint16_t tile_index = descriptor & 0x7FF;
@@ -78,42 +137,54 @@ static void draw_bg(int index, int screen_y)
 		bool x_flip = (descriptor >> 14) & 0x1;
 		bool y_flip = descriptor >> 15;
 
-		int tile_x = x & 0x7;
+		int tile_x = x & tile_size_mask;
 		if (x_flip)
 		{
-			tile_x = 7 - tile_x;
+			tile_x = tile_size_mask - tile_x;
 		}
 
-		int tile_y = y & 0x7;
+		int tile_y = y & tile_size_mask;
 		if (y_flip)
 		{
-			tile_y = 7 - tile_y;
+			tile_y = tile_size_mask - tile_y;
 		}
 
-		uint8_t* tile_ptr = vdp.tile + 0x1000 + (tile_index << 5);
-		tile_ptr += tile_x >> 1;
-		tile_ptr += tile_y << 2;
+		tile_index += tile_y & ~0x7;
+		tile_index += tile_x >> 3;
+		uint32_t offs = data_start + (tile_x & 0x7) + ((tile_y & 0x7) * 0x08) + (tile_index << 6);
 
 		uint8_t tile_data;
-		if (tile_x & 0x1)
+		if (is_8bit)
 		{
-			tile_data = (*tile_ptr) & 0xF;
+			tile_data = vdp.tile[offs & 0xFFFF];
 		}
 		else
 		{
-			tile_data = (*tile_ptr) >> 4;
+			tile_data = vdp.tile[(offs >> 1) & 0xFFFF];
+			if (tile_x & 0x1)
+			{
+				tile_data &= 0xF;
+			}
+			else
+			{
+				tile_data >>= 4;
+			}
 		}
 
-		//0 is transparent
+		//0 is transparent, no matter if it's 4-bit or 8-bit
 		if (!tile_data)
 		{
 			continue;
 		}
 
-		uint16_t palsel = vdp.bg_palsel[index];
-		int pal = (palsel >> (pal_descriptor * 4)) & 0xF;
-
-		uint8_t output = tile_data + (pal << 4);
+		uint8_t output = tile_data;
+		if (!is_8bit)
+		{
+			uint16_t palsel = vdp.bg_palsel[index];
+			int pal = (palsel >> (pal_descriptor * 4)) & 0xF;
+			output |= pal << 4;
+		}
+		
 		write_pal_color(vdp.bg_output[index], screen_x, screen_y, output);
 		write_screen(screen_index, screen_x, output);
 	}
