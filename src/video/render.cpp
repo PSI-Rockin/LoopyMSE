@@ -210,12 +210,43 @@ static void draw_bitmap(int index, int y)
 	int start_x = regs->screenx + regs->clipx;
 	int end_x = regs->screenx + regs->w;
 
+	bool is_8bit = false;
+	bool split_y = false;
+	int vram_width = 0, vram_height = 0;
+	switch (vdp.bitmap_ctrl)
+	{
+	case 0x00:
+		is_8bit = true;
+		split_y = true;
+		vram_width = 256;
+		vram_height = 256;
+		break;
+	case 0x01:
+		is_8bit = true;
+		vram_width = 256;
+		vram_height = 512;
+		break;
+	default:
+		assert(0);
+	}
+
+	assert(is_8bit);
+
+	int width_mask = vram_width - 1;
+	int height_mask = vram_height - 1;
+
 	for (int x = start_x; x <= end_x; x++)
 	{
-		int data_x = (regs->scrollx + x) & 0xFF;
-		int data_y = (regs->scrolly + y) & 0x1FF;
+		int data_x = (regs->scrollx + x) & width_mask;
+		int data_y = (regs->scrolly + y) & height_mask;
 
-		uint32_t addr = data_x + (data_y * 256);
+		//If split_y is true, there are two separate maps at y=0 and y=256 that get scrolled independently
+		if (split_y)
+		{
+			data_y |= regs->scrolly & 0x100;
+		}
+
+		uint32_t addr = data_x + (data_y * vram_width);
 		uint8_t data = vdp.bitmap[addr & 0x1FFFF];
 
 		int pair_index = index >> 1;
