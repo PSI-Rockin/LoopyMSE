@@ -161,6 +161,7 @@ static void draw_bg(int index, int screen_y)
 		else
 		{
 			offs >>= 1;
+			offs += vdp.tilebase << 9;
 			tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
 			if (tile_x & 0x1)
 			{
@@ -271,14 +272,140 @@ static void draw_bitmap(int index, int y)
 	}
 }
 
-static void draw_obj(int index, int y)
+static void draw_obj(int index, int screen_y)
 {
 	if (!vdp.layer_ctrl.obj_enable[index])
 	{
 		return;
 	}
 
-	//TODO
+	//TODO: limit the maximum number of sprites per scanline
+
+	//TODO: calculate this from the same way it's done for BGs
+	uint32_t data_start = 0x1000;
+
+	//OBJ #0 has highest priority, so the loop must be backwards
+	for (int id = OBJ_COUNT; id >= 0; id--)
+	{
+		int test_id = (id - vdp.obj_ctrl.id_offs) & 0xFF;
+		if (index == 0 && test_id >= OBJ_COUNT)
+		{
+			continue;
+		}
+		if (index == 1 && test_id < OBJ_COUNT)
+		{
+			continue;
+		}
+
+		uint32_t descriptor;
+		memcpy(&descriptor, vdp.oam + (id * 4), 4);
+		descriptor = Common::bswp32(descriptor);
+
+		if (descriptor & 0x200)
+		{
+			continue;
+		}
+
+		int tile_size = (descriptor >> 10) & 0x3;
+
+		int obj_width = 0, obj_height = 0;
+		switch (tile_size)
+		{
+		case 0x00:
+			obj_width = 8;
+			obj_height = 8;
+			break;
+		case 0x01:
+			obj_width = 16;
+			obj_height = 16;
+			break;
+		default:
+			assert(0);
+		}
+
+		int start_y = (descriptor >> 16) & 0xFF;
+
+		if (screen_y < start_y || screen_y >= start_y + obj_height)
+		{
+			continue;
+		}
+
+		int start_x = descriptor & 0x1FF;
+
+		for (int screen_x = start_x; screen_x < start_x + obj_width; screen_x++)
+		{
+			if ((screen_x & 0x1FF) >= DISPLAY_WIDTH)
+			{
+				continue;
+			}
+
+			bool x_flip = (descriptor >> 14) & 0x1;
+			bool y_flip = (descriptor >> 15) & 0x1;
+
+			int tile_x = (screen_x - start_x) & (obj_width - 1);
+			if (x_flip)
+			{
+				tile_x = obj_width - 1 - tile_x;
+			}
+
+			int tile_y = (screen_y - start_y) & (obj_height - 1);
+			if (y_flip)
+			{
+				tile_y = obj_height - 1 - tile_y;
+			}
+
+			int tile_index = descriptor >> 24;
+			tile_index += tile_y & ~0x7;
+			tile_index += tile_x >> 3;
+			uint32_t offs = (tile_x & 0x7) + ((tile_y & 0x7) * 0x08) + (tile_index << 6);
+
+			uint8_t tile_data;
+			if (vdp.obj_ctrl.is_8bit)
+			{
+				tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
+			}
+			else
+			{
+				offs >>= 1;
+				offs += vdp.tilebase << 9;
+				tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
+				if (tile_x & 0x1)
+				{
+					tile_data &= 0xF;
+				}
+				else
+				{
+					tile_data >>= 4;
+				}
+			}
+
+			if (!tile_data)
+			{
+				continue;
+			}
+
+			uint8_t output = tile_data;
+			if (!vdp.obj_ctrl.is_8bit)
+			{
+				uint16_t palsel = vdp.obj_palsel[index];
+				int pal_descriptor = (descriptor >> 12) & 0x3;
+				int pal = (palsel >> (pal_descriptor * 4)) & 0xF;
+				output |= pal << 4;
+			}
+
+			write_pal_color(vdp.obj_output[index], screen_x, screen_y, output);
+			int output_mode = vdp.layer_ctrl.obj_screen_mode[index];
+			if (output_mode & 0x1)
+			{
+				write_screen(1, screen_x, output);
+			}
+
+			if (output_mode & 0x2)
+			{
+				write_screen(0, screen_x, output);
+			}
+		}
+	}
 }
 
 static void process_color_math(int y)

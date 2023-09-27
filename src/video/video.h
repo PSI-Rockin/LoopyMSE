@@ -45,6 +45,8 @@ constexpr static int DMA_CTRL_END = 0x0405F000;
 constexpr static int DMA_START = 0x0405F000;
 constexpr static int DMA_END = 0x04060000;
 
+constexpr static int OBJ_COUNT = 128;
+
 void initialize();
 void shutdown();
 void dump_for_serial();

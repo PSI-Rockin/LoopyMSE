@@ -71,9 +71,16 @@ struct VDP
 	uint16_t bg_scrollx[2];
 	uint16_t bg_scrolly[2];
 	uint16_t bg_palsel[2];
-	uint16_t bg_tileoffs;
+	uint16_t tilebase;
 
-	uint16_t obj_ctrl;
+	struct ObjCtrl
+	{
+		int id_offs;
+		int tile_index_offs[2];
+		int is_8bit;
+	};
+
+	ObjCtrl obj_ctrl;
 	uint16_t obj_palsel[2];
 
 	//Display registers - 0x0C05Bxxx

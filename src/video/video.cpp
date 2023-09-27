@@ -163,6 +163,12 @@ void initialize()
 		vdp.screen_output[i] = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
 	}
 
+	//Set all OBJs to invisible
+	for (int i = 0; i < OAM_SIZE; i += 4)
+	{
+		oam_write32(i, 0x200);
+	}
+
 	for (int i = 0; i < 4; i++)
 	{
 		vdp.bitmap_output[i] = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
@@ -516,13 +522,19 @@ uint16_t bgobj_read16(uint32_t addr)
 	case 0x00C:
 		return vdp.bg_palsel[1];
 	case 0x010:
-		return vdp.obj_ctrl;
+	{
+		uint16_t result = vdp.obj_ctrl.id_offs;
+		result |= vdp.obj_ctrl.tile_index_offs[1] << 8;
+		result |= vdp.obj_ctrl.tile_index_offs[0] << 11;
+		result |= vdp.obj_ctrl.is_8bit << 14;
+		return result;
+	}
 	case 0x012:
 		return vdp.obj_palsel[0];
 	case 0x014:
 		return vdp.obj_palsel[1];
 	case 0x020:
-		return vdp.bg_tileoffs;
+		return vdp.tilebase;
 	default:
 		assert(0);
 		return 0;
@@ -581,7 +593,12 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 	}
 	case 0x010:
 		printf("[Video] write OBJ_CTRL: %04X\n", value);
-		vdp.obj_ctrl = value;
+		vdp.obj_ctrl.id_offs = value & 0xFF;
+
+		//Note the reversed order!
+		vdp.obj_ctrl.tile_index_offs[1] = (value >> 8) & 0x7;
+		vdp.obj_ctrl.tile_index_offs[0] = (value >> 11) & 0x7;
+		vdp.obj_ctrl.is_8bit = (value >> 14) & 0x1;
 		break;
 	case 0x012:
 	case 0x014:
@@ -592,8 +609,8 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 		break;
 	}
 	case 0x020:
-		printf("[Video] write BG_TILEOFFS: %04X\n", value);
-		vdp.bg_tileoffs = value & 0xFF;
+		printf("[Video] write TILEBASE: %04X\n", value);
+		vdp.tilebase = value & 0xFF;
 		break;
 	default:
 		assert(0);
