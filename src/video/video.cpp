@@ -115,8 +115,9 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	{
 		printf("[Video] VSYNC start\n");
 		vdp.vcount = VSYNC_START;
-		dump_all_bmps();
-		dump_for_serial();
+		dump_bmp("output_display", vdp.display_output);
+		//dump_all_bmps();
+		//dump_for_serial();
 	}
 
 	//At the end of VSYNC, wrap around to the start of the visible region
