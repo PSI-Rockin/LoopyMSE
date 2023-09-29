@@ -26,22 +26,22 @@ void initialize()
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
-		printf("Failed to initialize SDL2: %s\n", SDL_GetError());
+        printf("Failed to initialize SDL2: %s\n", SDL_GetError());
 
-		exit(0);
-	}
+        exit(0);
+    }
 
-	//Try synchronizing drawing to VBLANK
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+    //Try synchronizing drawing to VBLANK
+    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 
     //Set up SDL screen
-	SDL_CreateWindowAndRenderer(DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, &screen.window, &screen.renderer);
+    SDL_CreateWindowAndRenderer(DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, &screen.window, &screen.renderer);
     SDL_SetWindowTitle(screen.window, "Rupi");
-	SDL_SetWindowSize(screen.window, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
-	SDL_SetWindowResizable(screen.window, SDL_FALSE);
-	SDL_RenderSetLogicalSize(screen.renderer, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
+    SDL_SetWindowSize(screen.window, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
+    SDL_SetWindowResizable(screen.window, SDL_FALSE);
+    SDL_RenderSetLogicalSize(screen.renderer, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
 
-	screen.texture = SDL_CreateTexture(screen.renderer, SDL_PIXELFORMAT_ARGB1555, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+    screen.texture = SDL_CreateTexture(screen.renderer, SDL_PIXELFORMAT_ARGB1555, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
     isInitialized = true;
 }
@@ -49,8 +49,8 @@ void initialize()
 void shutdown() {
     //Destroy window, then kill SDL2
     SDL_DestroyTexture(screen.texture);
-	SDL_DestroyRenderer(screen.renderer);
-	SDL_DestroyWindow(screen.window);
+    SDL_DestroyRenderer(screen.renderer);
+    SDL_DestroyWindow(screen.window);
 
     SDL_Quit();
 
