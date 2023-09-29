@@ -1,4 +1,6 @@
 #include <cstdio>
+#include <cstring>
+#include <common/bswp.h>
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/peripherals/sh2_intc.h"
 #include "core/sh2/peripherals/sh2_ocpm.h"
@@ -19,6 +21,8 @@ constexpr static int DMAC_END = 0xF80;
 
 constexpr static int INTC_START = 0xF84;
 constexpr static int INTC_END = 0xF90;
+
+static uint8_t oram[0x400];
 
 uint8_t io_read8(uint32_t addr)
 {
@@ -144,6 +148,42 @@ void io_write32(uint32_t addr, uint32_t value)
 	default:
 		printf("[OCPM] write32 %08X: %08X\n", addr, value);
 	}
+}
+
+uint8_t oram_read8(uint32_t addr)
+{
+	return oram[addr & 0x3FF];
+}
+
+uint16_t oram_read16(uint32_t addr)
+{
+	uint16_t value;
+	memcpy(&value, &oram[addr & 0x3FF], 2);
+	return Common::bswp16(value);
+}
+
+uint32_t oram_read32(uint32_t addr)
+{
+	uint32_t value;
+	memcpy(&value, &oram[addr & 0x3FF], 4);
+	return Common::bswp32(value);
+}
+
+void oram_write8(uint32_t addr, uint8_t value)
+{
+	oram[addr & 0x3FF] = value;
+}
+
+void oram_write16(uint32_t addr, uint16_t value)
+{
+	value = Common::bswp16(value);
+	memcpy(&oram[addr & 0x3FF], &value, 2);
+}
+
+void oram_write32(uint32_t addr, uint32_t value)
+{
+	value = Common::bswp32(value);
+	memcpy(&oram[addr & 0x3FF], &value, 4);
 }
 
 }

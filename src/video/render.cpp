@@ -108,22 +108,21 @@ static void draw_bg(int index, int screen_y)
 	}
 
 	uint32_t map_start;
-	uint32_t data_start = tilemap_width * tilemap_height;
+	uint32_t data_start = (tilemap_width * tilemap_height) << 1;
 	if (!vdp.bg_ctrl.shared_maps)
 	{
 		map_start = (index == 1) ? data_start : 0;
-		data_start <<= 2;
+		data_start <<= 1;
 	}
 	else
 	{
 		map_start = 0;
-		data_start <<= 1;
 	}
 
 	for (int screen_x = 0; screen_x < 0x100; screen_x++)
 	{
-		int x = (screen_x + vdp.bg_scrollx[index]) & ((tilemap_width * 8) - 1);
-		int y = (screen_y + vdp.bg_scrolly[index]) & ((tilemap_height * 8) - 1);
+		int x = (screen_x + vdp.bg_scrollx[index]) & ((tilemap_width * tile_size) - 1);
+		int y = (screen_y + vdp.bg_scrolly[index]) & ((tilemap_height * tile_size) - 1);
 
 		uint16_t map_addr = map_start + ((x / tile_size) + ((y / tile_size) * tilemap_width));
 

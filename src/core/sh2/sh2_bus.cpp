@@ -23,6 +23,8 @@ static uint32_t translate_addr(uint32_t addr)
 }
 
 #define MMIO_ACCESS(access, ...)											\
+	if (addr >= OCPM::ORAM_BASE_ADDR && addr < OCPM::ORAM_END_ADDR)			\
+		return OCPM::oram_##access(__VA_ARGS__);							\
 	if (addr >= Video::PALETTE_START && addr < Video::PALETTE_END)			\
 		return Video::palette_##access(__VA_ARGS__);						\
 	if (addr >= Video::OAM_START && addr < Video::OAM_END)					\
@@ -41,8 +43,8 @@ static uint32_t translate_addr(uint32_t addr)
 		return Video::dma_ctrl_##access(__VA_ARGS__);						\
 	if (addr >= Video::DMA_START && addr < Video::DMA_END)					\
 		return Video::dma_##access(__VA_ARGS__);							\
-	if (addr >= OCPM::BASE_ADDR && addr < OCPM::END_ADDR)					\
-		return OCPM::io_##access(__VA_ARGS__);									\
+	if (addr >= OCPM::IO_BASE_ADDR && addr < OCPM::IO_END_ADDR)				\
+		return OCPM::io_##access(__VA_ARGS__);								\
 	return unmapped_##access(__VA_ARGS__);
 
 uint8_t unmapped_read8(uint32_t addr)
