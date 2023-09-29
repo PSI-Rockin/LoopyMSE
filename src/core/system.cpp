@@ -1,3 +1,4 @@
+#include <sdl/sdl.h>
 #include <video/video.h>
 #include "core/sh2/sh2.h"
 #include "core/memory.h"
@@ -18,6 +19,7 @@ void initialize(Config::SystemInfo& config)
 	SH2::initialize();
 
 	//Initialize subprojects after everything else
+	SDL::initialize();
 	Video::initialize();
 }
 
@@ -25,6 +27,7 @@ void shutdown()
 {
 	//Shutdown all components in the reverse order they were initialized
 	Video::shutdown();
+	SDL::shutdown();
 
 	SH2::shutdown();
 
