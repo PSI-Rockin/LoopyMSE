@@ -5,6 +5,7 @@
 #include <common/bswp.h>
 #include <core/memory.h>
 #include <core/timing.h>
+#include <sdl/sdl.h>
 #include "video/render.h"
 #include "video/vdp_local.h"
 #include "video/video.h"
@@ -108,6 +109,11 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	}
 
 	vdp.vcount++;
+
+	if (vdp.vcount == DISPLAY_HEIGHT)
+	{
+		SDL::update(vdp.display_output.get());
+	}
 	
 	//Once we go past the visible region, enter VSYNC
 	constexpr static int VSYNC_START = 0x1D9;
