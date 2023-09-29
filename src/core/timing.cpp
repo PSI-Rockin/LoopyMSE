@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <vector>
 #include "core/timing.h"
 
 namespace Timing
@@ -62,7 +63,7 @@ struct State
 
 static State state;
 
-static bool operator>(const Event& l, const Event& r)
+bool operator>(const Event& l, const Event& r)
 {
 	return l.exec_time > r.exec_time;
 }
