@@ -20,7 +20,7 @@ constexpr static int DMAC_END = 0xF80;
 constexpr static int INTC_START = 0xF84;
 constexpr static int INTC_END = 0xF90;
 
-uint8_t read8(uint32_t addr)
+uint8_t io_read8(uint32_t addr)
 {
 	addr = (addr & 0x1FF) + 0xE00;
 
@@ -42,7 +42,7 @@ uint8_t read8(uint32_t addr)
 	}
 }
 
-uint16_t read16(uint32_t addr)
+uint16_t io_read16(uint32_t addr)
 {
 	addr = (addr & 0x1FF) + 0xE00;
 
@@ -69,7 +69,7 @@ uint16_t read16(uint32_t addr)
 	}
 }
 
-uint32_t read32(uint32_t addr)
+uint32_t io_read32(uint32_t addr)
 {
 	addr = (addr & 0x1FF) + 0xE00;
 	switch (addr)
@@ -80,7 +80,7 @@ uint32_t read32(uint32_t addr)
 	}
 }
 
-void write8(uint32_t addr, uint8_t value)
+void io_write8(uint32_t addr, uint8_t value)
 {
 	addr = (addr & 0x1FF) + 0xE00;
 
@@ -103,7 +103,7 @@ void write8(uint32_t addr, uint8_t value)
 	}
 }
 
-void write16(uint32_t addr, uint16_t value)
+void io_write16(uint32_t addr, uint16_t value)
 {
 	addr = (addr & 0x1FF) + 0xE00;
 	if (addr >= TIMER_START && addr < TIMER_END)
@@ -131,7 +131,7 @@ void write16(uint32_t addr, uint16_t value)
 	}
 }
 
-void write32(uint32_t addr, uint32_t value)
+void io_write32(uint32_t addr, uint32_t value)
 {
 	addr = (addr & 0x1FF) + 0xE00;
 	if (addr >= DMAC_START && addr < DMAC_END)
