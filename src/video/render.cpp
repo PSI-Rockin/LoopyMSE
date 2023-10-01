@@ -291,6 +291,7 @@ static void draw_obj(int index, int screen_y)
 		{
 			continue;
 		}
+
 		if (index == 1 && test_id < OBJ_COUNT)
 		{
 			continue;
@@ -299,11 +300,6 @@ static void draw_obj(int index, int screen_y)
 		uint32_t descriptor;
 		memcpy(&descriptor, vdp.oam + (id * 4), 4);
 		descriptor = Common::bswp32(descriptor);
-
-		if (descriptor & 0x200)
-		{
-			continue;
-		}
 
 		int tile_size = (descriptor >> 10) & 0x3;
 
@@ -323,10 +319,25 @@ static void draw_obj(int index, int screen_y)
 		}
 
 		int start_y = (descriptor >> 16) & 0xFF;
+		bool high_y = (descriptor >> 9) & 0x1;
 
-		if (screen_y < start_y || screen_y >= start_y + obj_height)
+		start_y |= high_y << 8;
+
+		int end_y = (start_y + obj_height) & 0x1FF;
+
+		if (end_y > start_y)
 		{
-			continue;
+			if (screen_y < start_y || screen_y >= end_y)
+			{
+				continue;
+			}
+		}
+		else
+		{
+			if (screen_y < start_y && screen_y >= end_y)
+			{
+				continue;
+			}
 		}
 
 		int start_x = descriptor & 0x1FF;
@@ -407,89 +418,8 @@ static void draw_obj(int index, int screen_y)
 	}
 }
 
-static void process_color_math(int y)
+static void draw_layers(int y)
 {
-	for (int x = 0; x < DISPLAY_WIDTH; x++)
-	{
-		uint16_t input_a = 0, input_b = 0;
-		if (vdp.color_prio.output_screen_a)
-		{
-			input_a = read_screen(0, x);
-			write_color(vdp.screen_output[0], x, y, input_a);
-		}
-
-		if (vdp.color_prio.output_screen_b)
-		{
-			input_b = read_screen(1, x);
-			write_color(vdp.screen_output[1], x, y, input_b);
-		}
-
-		int a_r = (input_a >> 10) & 0x1F;
-		int a_g = (input_a >> 5) & 0x1F;
-		int a_b = input_a & 0x1F;
-
-		int b_r = (input_b >> 10) & 0x1F;
-		int b_g = (input_b >> 5) & 0x1F;
-		int b_b = input_b & 0x1F;
-
-		int out_r, out_g, out_b;
-
-		if (vdp.color_prio.blend_mode)
-		{
-			//Subtractive blending
-			out_r = a_r - b_r;
-			out_g = a_g - b_g;
-			out_b = a_b - b_b;
-		}
-		else
-		{
-			//Additive blending
-			out_r = a_r + b_r;
-			out_g = a_g + b_g;
-			out_b = a_b + b_b;
-		}
-
-		out_r = std::clamp(out_r, 0, 0x1F);
-		out_g = std::clamp(out_g, 0, 0x1F);
-		out_b = std::clamp(out_b, 0, 0x1F);
-
-		uint16_t output = (out_r << 10) | (out_g << 5) | out_b;
-		write_color(vdp.display_output, x, y, output);
-	}
-}
-
-static void display_capture(int y)
-{
-	switch (vdp.capture_ctrl.format)
-	{
-	case 0x03:
-		//Capture screen A before applying the palette
-		memcpy(vdp.capture_buffer, vdp.screens[0], 0x100);
-		break;
-	default:
-		assert(0);
-	}
-}
-
-void draw_scanline(int y)
-{
-	//Clear the output buffers
-	constexpr static int LINE_SIZE = DISPLAY_WIDTH * 2;
-	int offs = y * DISPLAY_WIDTH;
-	for (int i = 0; i < 2; i++)
-	{
-		memset(vdp.bg_output[i].get() + offs, 0, LINE_SIZE);
-		memset(vdp.obj_output[i].get() + offs, 0, LINE_SIZE);
-		memset(vdp.bitmap_output[i].get() + offs, 0, LINE_SIZE);
-		memset(vdp.bitmap_output[i + 2].get() + offs, 0, LINE_SIZE);
-		memset(vdp.screen_output[i].get() + offs, 0, LINE_SIZE);
-	}
-
-	memset(vdp.display_output.get() + offs, 0, LINE_SIZE);
-
-	//Set both screens to the backdrop color
-	memset(vdp.screens, 0, sizeof(vdp.screens));
-
 	//Draw each layer
 	//The order is important - each layer has a different priority, and lower priority layers are drawn first here
 	int bitmap_prio = vdp.color_prio.prio_mode & 0x1;
@@ -538,8 +468,165 @@ void draw_scanline(int y)
 	{
 		draw_obj(0, y);
 	}
+}
 
-	process_color_math(y);
+static void draw_color_math(int y, bool half)
+{
+	for (int x = 0; x < DISPLAY_WIDTH; x++)
+	{
+		uint16_t input_a = 0, input_b = 0;
+		if (vdp.color_prio.output_screen_a)
+		{
+			input_a = read_screen(0, x);
+		}
+
+		if (vdp.color_prio.output_screen_b)
+		{
+			input_b = read_screen(1, x);
+		}
+
+		int a_r = (input_a >> 10) & 0x1F;
+		int a_g = (input_a >> 5) & 0x1F;
+		int a_b = input_a & 0x1F;
+
+		int b_r = (input_b >> 10) & 0x1F;
+		int b_g = (input_b >> 5) & 0x1F;
+		int b_b = input_b & 0x1F;
+
+		int out_r, out_g, out_b;
+
+		if (vdp.color_prio.blend_mode)
+		{
+			//Subtractive blending
+			out_r = a_r - b_r;
+			out_g = a_g - b_g;
+			out_b = a_b - b_b;
+		}
+		else
+		{
+			//Additive blending
+			out_r = a_r + b_r;
+			out_g = a_g + b_g;
+			out_b = a_b + b_b;
+		}
+
+		if (half)
+		{
+			out_r >>= 1;
+			out_g >>= 1;
+			out_b >>= 1;
+		}
+
+		out_r = std::clamp(out_r, 0, 0x1F);
+		out_g = std::clamp(out_g, 0, 0x1F);
+		out_b = std::clamp(out_b, 0, 0x1F);
+
+		uint16_t output = (out_r << 10) | (out_g << 5) | out_b;
+		write_color(vdp.display_output, x, y, output);
+	}
+}
+
+static void draw_screen_overlay(int y, bool screen_b_prio)
+{
+	for (int x = 0; x < DISPLAY_WIDTH; x++)
+	{
+		uint16_t input_a = 0, input_b = 0;
+		if (vdp.color_prio.output_screen_a)
+		{
+			input_a = read_screen(0, x);
+		}
+
+		if (vdp.color_prio.output_screen_b)
+		{
+			input_b = read_screen(1, x);
+		}
+
+		uint16_t output = 0;
+		if (screen_b_prio)
+		{
+			output = input_a;
+
+			if (vdp.screens[1][x])
+			{
+				output = input_b;
+			}
+		}
+		else
+		{
+			output = input_b;
+
+			if (vdp.screens[0][x])
+			{
+				output = input_a;
+			}
+		}
+
+		write_color(vdp.display_output, x, y, output);
+	}
+}
+
+static void display_capture(int y)
+{
+	switch (vdp.capture_ctrl.format)
+	{
+	case 0x03:
+		//Capture screen A before applying the palette
+		memcpy(vdp.capture_buffer, vdp.screens[0], 0x100);
+		break;
+	default:
+		assert(0);
+	}
+}
+
+void draw_scanline(int y)
+{
+	//Clear the output buffers
+	constexpr static int LINE_SIZE = DISPLAY_WIDTH * 2;
+	int offs = y * DISPLAY_WIDTH;
+	for (int i = 0; i < 2; i++)
+	{
+		memset(vdp.bg_output[i].get() + offs, 0, LINE_SIZE);
+		memset(vdp.obj_output[i].get() + offs, 0, LINE_SIZE);
+		memset(vdp.bitmap_output[i].get() + offs, 0, LINE_SIZE);
+		memset(vdp.bitmap_output[i + 2].get() + offs, 0, LINE_SIZE);
+		memset(vdp.screen_output[i].get() + offs, 0, LINE_SIZE);
+	}
+
+	memset(vdp.display_output.get() + offs, 0, LINE_SIZE);
+
+	//Set both screens to the backdrop color
+	memset(vdp.screens, 0, sizeof(vdp.screens));
+
+	draw_layers(y);
+
+	//Fetch the screen colors
+	for (int x = 0; x < DISPLAY_WIDTH; x++)
+	{
+		uint16_t color = read_screen(0, x);
+		write_color(vdp.screen_output[0], x, y, color);
+
+		color = read_screen(1, x);
+		write_color(vdp.screen_output[1], x, y, color);
+	}
+
+	//Draw the screens to the display output buffer
+	switch (vdp.dispmode)
+	{
+	case 0x00:
+		draw_color_math(y, false);
+		break;
+	case 0x01:
+		draw_color_math(y, true);
+		break;
+	case 0x04:
+		draw_screen_overlay(y, true);
+		break;
+	case 0x05:
+		draw_screen_overlay(y, false);
+		break;
+	default:
+		assert(0);
+	}
 
 	if (vdp.capture_enable && y == vdp.capture_ctrl.scanline)
 	{
