@@ -699,6 +699,15 @@ static void or_imm(uint16_t instr)
 	sh2.gpr[0] |= imm;
 }
 
+static void orb_gbrrel(uint16_t instr)
+{
+	uint32_t imm = instr & 0xFF;
+
+	uint32_t addr = sh2.gbr + sh2.gpr[0];
+	uint8_t val = Bus::read8(addr);
+	Bus::write8(addr, val | imm);
+}
+
 static void tst_reg(uint16_t instr)
 {
 	uint32_t reg1 = (instr >> 4) & 0xF;
@@ -894,6 +903,11 @@ static void rts(uint16_t instr)
 
 //System control instructions
 
+static void clrt(uint16_t instr)
+{
+	SET_T(false);
+}
+
 static void ldc_reg(uint16_t instr)
 {
 	uint32_t index = (instr >> 4) & 0xF;
@@ -910,6 +924,14 @@ static void ldcl_mem_inc(uint16_t instr)
 	uint32_t value = Bus::read32(sh2.gpr[mem]);
 	set_control_reg(reg, value);
 	sh2.gpr[mem] += 4;
+}
+
+static void lds_reg(uint16_t instr)
+{
+	uint32_t index = (instr >> 4) & 0xF;
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	set_system_reg(index, sh2.gpr[reg]);
 }
 
 static void ldsl_mem_inc(uint16_t instr)
@@ -1231,6 +1253,10 @@ void run(uint16_t instr)
 	{
 		or_imm(instr);
 	}
+	else if ((instr & 0xFF00) == 0xCF00)
+	{
+		orb_gbrrel(instr);
+	}
 	else if ((instr & 0xF00F) == 0x2008)
 	{
 		tst_reg(instr);
@@ -1323,6 +1349,10 @@ void run(uint16_t instr)
 	{
 		rts(instr);
 	}
+	else if (instr == 0x0008)
+	{
+		clrt(instr);
+	}
 	else if ((instr & 0xF00F) == 0x400E)
 	{
 		ldc_reg(instr);
@@ -1330,6 +1360,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x4007)
 	{
 		ldcl_mem_inc(instr);
+	}
+	else if ((instr & 0xF00F) == 0x400A)
+	{
+		lds_reg(instr);
 	}
 	else if ((instr & 0xF00F) == 0x4006)
 	{
