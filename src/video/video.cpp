@@ -88,6 +88,9 @@ static void dump_all_bmps()
 		std::string screen_name = "output_screen_";
 		screen_name += (i == 1) ? 'B' : 'A';
 		dump_bmp(screen_name, vdp.screen_output[i]);
+
+		std::string obj_name = "output_obj";
+		dump_bmp(obj_name + num, vdp.obj_output[i]);
 	}
 
 	dump_bmp("output_display", vdp.display_output);

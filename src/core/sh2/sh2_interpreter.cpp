@@ -192,6 +192,17 @@ static void movl_mem_reg(uint16_t instr)
 	sh2.gpr[reg] = Bus::read32(sh2.gpr[mem]);
 }
 
+static void movb_reg_mem_dec(uint16_t instr)
+{
+	uint32_t reg = (instr >> 4) & 0xF;
+	uint32_t mem = (instr >> 8) & 0xF;
+
+	//Edge case: if reg and mem are the same, the original value must be written to memory
+	uint8_t value = sh2.gpr[reg];
+	sh2.gpr[mem]--;
+	Bus::write8(sh2.gpr[mem], value);
+}
+
 static void movw_reg_mem_dec(uint16_t instr)
 {
 	uint32_t reg = (instr >> 4) & 0xF;
@@ -199,7 +210,7 @@ static void movw_reg_mem_dec(uint16_t instr)
 
 	//Edge case: if reg and mem are the same, the original value must be written to memory
 	uint16_t value = sh2.gpr[reg];
-	sh2.gpr[mem] -= 4;
+	sh2.gpr[mem] -= 2;
 	Bus::write16(sh2.gpr[mem], value);
 }
 
@@ -376,6 +387,12 @@ static void movw_gbrrel_reg(uint16_t instr)
 {
 	uint32_t offs = (instr & 0xFF) << 1;
 	sh2.gpr[0] = (int32_t)(int16_t)Bus::read16(sh2.gbr + offs);
+}
+
+static void movl_gbrrel_reg(uint16_t instr)
+{
+	uint32_t offs = (instr & 0xFF) << 2;
+	sh2.gpr[0] = Bus::read32(sh2.gbr + offs);
 }
 
 static void mova(uint16_t instr)
@@ -1037,6 +1054,10 @@ void run(uint16_t instr)
 	{
 		movl_mem_reg(instr);
 	}
+	else if ((instr & 0xF00F) == 0x2004)
+	{
+		movb_reg_mem_dec(instr);
+	}
 	else if ((instr & 0xF00F) == 0x2005)
 	{
 		movw_reg_mem_dec(instr);
@@ -1124,6 +1145,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xFF00) == 0xC500)
 	{
 		movw_gbrrel_reg(instr);
+	}
+	else if ((instr & 0xFF00) == 0xC600)
+	{
+		movl_gbrrel_reg(instr);
 	}
 	else if ((instr & 0xFF00) == 0xC700)
 	{

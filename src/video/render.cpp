@@ -226,11 +226,14 @@ static void draw_bitmap(int index, int y)
 		vram_width = 256;
 		vram_height = 512;
 		break;
+	case 0x04:
+		is_8bit = false;
+		vram_width = 512;
+		vram_height = 512;
+		break;
 	default:
 		assert(0);
 	}
-
-	assert(is_8bit);
 
 	int width_mask = vram_width - 1;
 	int height_mask = vram_height - 1;
@@ -247,7 +250,24 @@ static void draw_bitmap(int index, int y)
 		}
 
 		uint32_t addr = data_x + (data_y * vram_width);
-		uint8_t data = vdp.bitmap[addr & 0x1FFFF];
+		uint8_t data;
+		if (is_8bit)
+		{
+			data = vdp.bitmap[addr & 0x1FFFF];
+		}
+		else
+		{
+			addr >>= 1;
+			data = vdp.bitmap[addr & 0x1FFFF];
+			if (data_x & 0x1)
+			{
+				data &= 0xF;
+			}
+			else
+			{
+				data >>= 4;
+			}
+		}
 
 		int pair_index = index >> 1;
 		int output_mode = vdp.layer_ctrl.bitmap_screen_mode[pair_index];
@@ -255,6 +275,12 @@ static void draw_bitmap(int index, int y)
 		if (!data)
 		{
 			continue;
+		}
+
+		if (!is_8bit)
+		{
+			int pal = (vdp.bitmap_palsel >> ((3 - index) * 4)) & 0xF;
+			data |= pal << 4;
 		}
 
 		write_pal_color(vdp.bitmap_output[index], x, y + regs->screeny, data);
@@ -313,6 +339,14 @@ static void draw_obj(int index, int screen_y)
 		case 0x01:
 			obj_width = 16;
 			obj_height = 16;
+			break;
+		case 0x02:
+			obj_width = 16;
+			obj_height = 32;
+			break;
+		case 0x03:
+			obj_width = 32;
+			obj_height = 32;
 			break;
 		default:
 			assert(0);
