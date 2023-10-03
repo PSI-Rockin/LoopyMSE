@@ -50,7 +50,9 @@ struct VDP
 		uint16_t w;
 		uint16_t clipx;
 		uint16_t h;
-		uint16_t outline_color;
+		uint16_t buffer_ctrl;
+
+		uint8_t buffered_color;
 	};
 
 	BitmapRegs bitmap_regs[4];

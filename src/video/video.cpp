@@ -352,7 +352,7 @@ uint16_t bitmap_reg_read16(uint32_t addr)
 	case 0x040:
 		return vdp.bitmap_palsel;
 	case 0x050:
-		return layer->outline_color;
+		return layer->buffer_ctrl;
 	default:
 		assert(0);
 		return 0;
@@ -382,7 +382,7 @@ void bitmap_reg_write16(uint32_t addr, uint16_t value)
 	{
 	case 0x000:
 		printf("[Video] write BM%d_SCROLLX: %04X\n", index, value);
-		layer->scrollx = value & 0xFF;
+		layer->scrollx = value & 0x1FF;
 		break;
 	case 0x008:
 		printf("[Video] write BM%d_SCROLLY: %04X\n", index, value);
@@ -414,8 +414,8 @@ void bitmap_reg_write16(uint32_t addr, uint16_t value)
 		vdp.bitmap_palsel = value;
 		break;
 	case 0x050:
-		printf("[Video] write BM%d_OUTLINE_COLOR: %04X\n", index, value);
-		layer->outline_color = value;
+		printf("[Video] write BM%d_BUFFER_CTRL: %04X\n", index, value);
+		layer->buffer_ctrl = value;
 		break;
 	default:
 		assert(0);

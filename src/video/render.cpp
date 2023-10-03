@@ -205,10 +205,8 @@ static void draw_bitmap(int index, int y)
 		return;
 	}
 
-	y = y - regs->screeny;
-
-	int start_x = regs->screenx + regs->clipx;
-	int end_x = regs->screenx + regs->w;
+	int start_x = (regs->screenx + regs->clipx) & 0x1FF;
+	int end_x = (regs->screenx + regs->w + 1) & 0x1FF;
 
 	bool is_8bit = false;
 	bool split_y = false;
@@ -238,10 +236,12 @@ static void draw_bitmap(int index, int y)
 	int width_mask = vram_width - 1;
 	int height_mask = vram_height - 1;
 
-	for (int x = start_x; x <= end_x; x++)
+	//The entire row needs to be looped rather than just the bitmap range because the buffer color is updated even outside the bitmap
+	//TODO: this could likely be optimized in the case where the buffer color is disabled (which is most of the time)
+	for (int x = 0; x < vram_width; x++)
 	{
-		int data_x = (regs->scrollx + x) & width_mask;
-		int data_y = (regs->scrolly + y) & height_mask;
+		int data_x = (regs->scrollx + x - regs->screenx) & width_mask;
+		int data_y = (regs->scrolly + y - regs->screeny) & height_mask;
 
 		//If split_y is true, there are two separate maps at y=0 and y=256 that get scrolled independently
 		if (split_y)
@@ -269,30 +269,63 @@ static void draw_bitmap(int index, int y)
 			}
 		}
 
-		int pair_index = index >> 1;
-		int output_mode = vdp.layer_ctrl.bitmap_screen_mode[pair_index];
+		uint8_t output = data;
+		if (!is_8bit)
+		{
+			int pal = (vdp.bitmap_palsel >> ((3 - index) * 4)) & 0xF;
+			output |= pal << 4;
+		}
 
+		if (regs->buffer_ctrl & 0x100)
+		{
+			if (data == 0xFF)
+			{
+				//HW bug: 0xFF fails to get replaced if x=0xFF
+				if (x != 0xFF)
+				{
+					data = regs->buffered_color;
+				}
+			}
+			else if (data < (regs->buffer_ctrl & 0xFF))
+			{
+				regs->buffered_color = data;
+			}
+		}
+
+		//Now that the buffer control logic has been processed, the pixel can actually be drawn appropriately
 		if (!data)
 		{
 			continue;
 		}
 
-		if (!is_8bit)
+		if (end_x > start_x)
 		{
-			int pal = (vdp.bitmap_palsel >> ((3 - index) * 4)) & 0xF;
-			data |= pal << 4;
+			if (x < start_x || x >= end_x)
+			{
+				continue;
+			}
+		}
+		else
+		{
+			if (x < start_x && x >= end_x)
+			{
+				continue;
+			}
 		}
 
-		write_pal_color(vdp.bitmap_output[index], x, y + regs->screeny, data);
+		int pair_index = index >> 1;
+		int output_mode = vdp.layer_ctrl.bitmap_screen_mode[pair_index];
+
+		write_pal_color(vdp.bitmap_output[index], x, y, output);
 
 		if (output_mode & 0x1)
 		{
-			write_screen(1, x, data);
+			write_screen(1, x, output);
 		}
 
 		if (output_mode & 0x2)
 		{
-			write_screen(0, x, data);
+			write_screen(0, x, output);
 		}
 	}
 }
