@@ -1,9 +1,10 @@
 #include <cstdio>
 #include <cstdlib>
-#include <video/video.h>
-#include "sdl/sdl.h"
-
+#include <fstream>
 #include <SDL.h>
+#include <core/config.h>
+#include <core/system.h>
+#include <video/video.h>
 
 namespace SDL
 {
@@ -19,8 +20,6 @@ struct Screen
 };
 
 static Screen screen;
-
-static bool isInitialized = false;
 
 void initialize()
 {
@@ -42,8 +41,6 @@ void initialize()
     SDL_RenderSetLogicalSize(screen.renderer, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
 
     screen.texture = SDL_CreateTexture(screen.renderer, SDL_PIXELFORMAT_ARGB1555, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-
-    isInitialized = true;
 }
 
 void shutdown() {
@@ -53,34 +50,63 @@ void shutdown() {
     SDL_DestroyWindow(screen.window);
 
     SDL_Quit();
-
-    isInitialized = false;
 }
 
 void update(uint16_t* display_output)
 {
-    if (!isInitialized)
-    {
-        return;
-    }
-
-    //Poll events
-    SDL_Event e;
-    while (SDL_PollEvent(&e))
-    {
-        switch (e.type)
-        {
-        case SDL_QUIT:
-            exit(0);
-        default:
-            break;
-        }
-    }
-
     // Draw screen
     SDL_UpdateTexture(screen.texture, NULL, display_output, sizeof(uint16_t) * DISPLAY_WIDTH);
     SDL_RenderCopy(screen.renderer, screen.texture, NULL, NULL);
     SDL_RenderPresent(screen.renderer);
 }
 
+}
+
+int main()
+{
+    SDL::initialize();
+
+    Config::SystemInfo config = {};
+
+    std::ifstream cart_file("D:/anime_land_be.bin", std::ios::binary);
+    if (!cart_file.is_open())
+    {
+        return 1;
+    }
+
+    config.cart_rom.assign(std::istreambuf_iterator<char>(cart_file), {});
+    cart_file.close();
+
+    std::ifstream bios_file("D:/loopy_bios.bin", std::ios::binary);
+    if (!bios_file.is_open())
+    {
+        return 1;
+    }
+
+    config.bios_rom.assign(std::istreambuf_iterator<char>(bios_file), {});
+    bios_file.close();
+    System::initialize(config);
+    
+    bool has_quit = false;
+    while (!has_quit)
+    {
+        System::run();
+        SDL::update(System::get_display_output());
+
+        SDL_Event e;
+        while (SDL_PollEvent(&e))
+        {
+            switch (e.type)
+            {
+            case SDL_QUIT:
+                has_quit = true;
+                break;
+            }
+        }
+    }
+    
+    System::shutdown();
+    SDL::shutdown();
+
+    return 0;
 }

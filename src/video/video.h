@@ -49,6 +49,12 @@ constexpr static int OBJ_COUNT = 128;
 
 void initialize();
 void shutdown();
+
+void start_frame();
+bool check_frame_end();
+
+uint16_t* get_display_output();
+
 void dump_for_serial();
 
 //TODO: should these MMIO accessors be moved to a different file?
