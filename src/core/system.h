@@ -9,4 +9,6 @@ void shutdown();
 
 void run();
 
+uint16_t* get_display_output();
+
 }

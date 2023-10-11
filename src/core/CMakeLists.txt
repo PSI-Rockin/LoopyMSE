@@ -1,5 +1,7 @@
 add_library (core STATIC
 			 "config.h"
+			 "loopy_io.cpp"
+			 "loopy_io.h"
 			 "memory.cpp"
 			 "memory.h"
 			 "system.cpp"
@@ -26,4 +28,4 @@ add_library (core STATIC
 			 "sh2/peripherals/sh2_serial.cpp"
 			 "sh2/peripherals/sh2_serial.h")
 
-target_link_libraries(core PRIVATE common video)
+target_link_libraries(core PRIVATE common input video)

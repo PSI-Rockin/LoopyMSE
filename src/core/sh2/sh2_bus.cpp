@@ -6,6 +6,7 @@
 #include "core/sh2/peripherals/sh2_ocpm.h"
 #include "core/sh2/sh2_bus.h"
 #include "core/sh2/sh2_local.h"
+#include "core/loopy_io.h"
 
 namespace SH2::Bus
 {
@@ -39,6 +40,8 @@ static uint32_t translate_addr(uint32_t addr)
 		return Video::bgobj_##access(__VA_ARGS__);							\
 	if (addr >= Video::DISPLAY_REG_START && addr < Video::DISPLAY_REG_END)	\
 		return Video::display_##access(__VA_ARGS__);						\
+	if (addr >= LoopyIO::BASE_ADDR && addr < LoopyIO::END_ADDR)				\
+		return LoopyIO::reg_##access(__VA_ARGS__);							\
 	if (addr >= Video::DMA_CTRL_START && addr < Video::DMA_CTRL_END)		\
 		return Video::dma_ctrl_##access(__VA_ARGS__);						\
 	if (addr >= Video::DMA_START && addr < Video::DMA_END)					\

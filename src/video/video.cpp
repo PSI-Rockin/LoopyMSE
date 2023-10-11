@@ -118,6 +118,7 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	{
 		printf("[Video] VSYNC start\n");
 		vdp.vcount = VSYNC_START;
+		vdp.frame_ended = true;
 		dump_bmp("output_display", vdp.display_output);
 		//dump_all_bmps();
 		//dump_for_serial();
@@ -194,6 +195,21 @@ void initialize()
 void shutdown()
 {
 	// nop
+}
+
+void start_frame()
+{
+	vdp.frame_ended = false;
+}
+
+bool check_frame_end()
+{
+	return vdp.frame_ended;
+}
+
+uint16_t* get_display_output()
+{
+	return vdp.display_output.get();
 }
 
 void dump_for_serial()

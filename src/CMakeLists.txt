@@ -2,5 +2,6 @@
 
 add_subdirectory(common)
 add_subdirectory(core)
+add_subdirectory(input)
 add_subdirectory(video)
-add_subdirectory(win32)
+add_subdirectory(sdl)

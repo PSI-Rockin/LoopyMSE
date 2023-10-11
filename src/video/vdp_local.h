@@ -14,6 +14,8 @@ struct VDP
 	std::unique_ptr<uint16_t[]> screen_output[2];
 	std::unique_ptr<uint16_t[]> display_output;
 
+	int frame_ended;
+
 	//Screen A is 0, Screen B is 1
 	uint8_t screens[2][DISPLAY_WIDTH];
 
