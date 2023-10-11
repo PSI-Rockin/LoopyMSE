@@ -157,6 +157,8 @@ uint16_t read16(uint32_t addr)
 	Channel* chan = &state.chan[addr >> 4];
 	switch (reg)
 	{
+	case 0x0A:
+		return chan->transfer_size & 0xFFFF;
 	case 0x0E:
 		return chan->get_ctrl();
 	default:

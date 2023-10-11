@@ -511,8 +511,15 @@ void ctrl_write32(uint32_t addr, uint32_t value)
 
 uint8_t bgobj_read8(uint32_t addr)
 {
-	assert(0);
-	return 0;
+	addr &= 0xFFF;
+	switch (addr)
+	{
+	case 0x20:
+		return vdp.tilebase;
+	default:
+		assert(0);
+		return 0;
+	}
 }
 
 uint16_t bgobj_read16(uint32_t addr)

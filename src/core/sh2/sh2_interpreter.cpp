@@ -8,6 +8,7 @@ namespace SH2::Interpreter
 {
 
 #define GET_T() (sh2.sr & 0x1)
+#define GET_S() ((sh2.sr >> 1) & 0x1)
 #define GET_Q() ((sh2.sr >> 8) & 0x1)
 #define GET_M() ((sh2.sr >> 9) & 0x1)
 
@@ -632,6 +633,38 @@ static void extuw(uint16_t instr)
 	sh2.gpr[dst] = sh2.gpr[src] & 0xFFFF;
 }
 
+static void macw(uint16_t instr)
+{
+	uint32_t reg1 = (instr >> 4) & 0xF;
+	uint32_t reg2 = (instr >> 8) & 0xF;
+
+	//The operands are memory locations, not register values...
+	int32_t value1 = (int32_t)(int16_t)Bus::read16(sh2.gpr[reg1]);
+	int32_t value2 = (int32_t)(int16_t)Bus::read16(sh2.gpr[reg2]);
+
+	bool saturate = GET_S();
+	assert(!saturate);
+
+	//TODO: is this correct?
+	int32_t tmp = value1 * value2;
+	int64_t result = sh2.macl | ((uint64_t)sh2.mach << 32ULL);
+
+	result += (int64_t)tmp;
+
+	sh2.macl = result & 0xFFFFFFFF;
+	sh2.mach = (result >> 32) & 0x3FF;
+
+	//Sign extend
+	if (sh2.mach & 0x200)
+	{
+		sh2.mach |= 0xFFFFFC00;
+	}
+
+	//Post-increment by the size of a 16-bit word
+	sh2.gpr[reg1] += 2;
+	sh2.gpr[reg2] += 2;
+}
+
 static void mulsw(uint16_t instr)
 {
 	uint32_t reg1 = (instr >> 4) & 0xF;
@@ -701,6 +734,15 @@ static void and_imm(uint16_t instr)
 	sh2.gpr[0] &= imm;
 }
 
+static void andb_gbrrel(uint16_t instr)
+{
+	uint32_t imm = instr & 0xFF;
+
+	uint32_t addr = sh2.gbr + sh2.gpr[0];
+	uint8_t val = Bus::read8(addr);
+	Bus::write8(addr, val & imm);
+}
+
 static void or_reg(uint16_t instr)
 {
 	uint32_t src = (instr >> 4) & 0xF;
@@ -748,6 +790,22 @@ static void xor_reg(uint16_t instr)
 	uint32_t dst = (instr >> 8) & 0xF;
 
 	sh2.gpr[dst] ^= sh2.gpr[src];
+}
+
+static void xor_imm(uint16_t instr)
+{
+	uint32_t imm = instr & 0xFF;
+
+	sh2.gpr[0] ^= imm;
+}
+
+static void xorb_gbrrel(uint16_t instr)
+{
+	uint32_t imm = instr & 0xFF;
+
+	uint32_t addr = sh2.gbr + sh2.gpr[0];
+	uint8_t val = Bus::read8(addr);
+	Bus::write8(addr, val ^ imm);
 }
 
 //Shift instructions
@@ -919,6 +977,12 @@ static void rts(uint16_t instr)
 }
 
 //System control instructions
+
+static void clrmac(uint16_t instr)
+{
+	sh2.macl = 0;
+	sh2.mach = 0;
+}
 
 static void clrt(uint16_t instr)
 {
@@ -1242,6 +1306,10 @@ void run(uint16_t instr)
 	{
 		extuw(instr);
 	}
+	else if ((instr & 0xF00F) == 0x400F)
+	{
+		macw(instr);
+	}
 	else if ((instr & 0xF00F) == 0x200F)
 	{
 		mulsw(instr);
@@ -1270,6 +1338,10 @@ void run(uint16_t instr)
 	{
 		and_imm(instr);
 	}
+	else if ((instr & 0xFF00) == 0xCD00)
+	{
+		andb_gbrrel(instr);
+	}
 	else if ((instr & 0xF00F) == 0x200B)
 	{
 		or_reg(instr);
@@ -1293,6 +1365,14 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x200A)
 	{
 		xor_reg(instr);
+	}
+	else if ((instr & 0xFF00) == 0xCA00)
+	{
+		xor_imm(instr);
+	}
+	else if ((instr & 0xFF00) == 0xCE00)
+	{
+		xorb_gbrrel(instr);
 	}
 	else if ((instr & 0xF0FF) == 0x4004)
 	{
@@ -1373,6 +1453,10 @@ void run(uint16_t instr)
 	else if (instr == 0x000B)
 	{
 		rts(instr);
+	}
+	else if (instr == 0x0028)
+	{
+		clrmac(instr);
 	}
 	else if (instr == 0x0008)
 	{

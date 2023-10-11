@@ -58,7 +58,12 @@ void reg_write8(uint32_t addr, uint8_t value)
 
 void reg_write16(uint32_t addr, uint16_t value)
 {
-	assert(0);
+	addr &= 0xFFF;
+	switch (addr)
+	{
+	default:
+		printf("[IO] unmapped write16 %08X: %04X\n", addr, value);
+	}
 }
 
 void reg_write32(uint32_t addr, uint32_t value)
