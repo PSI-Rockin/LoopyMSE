@@ -4,6 +4,7 @@
 #include <SDL.h>
 #include <core/config.h>
 #include <core/system.h>
+#include <input/input.h>
 #include <video/video.h>
 
 namespace SDL
@@ -86,6 +87,22 @@ int main()
     config.bios_rom.assign(std::istreambuf_iterator<char>(bios_file), {});
     bios_file.close();
     System::initialize(config);
+
+    //All subprojects have been initialized, so it is safe to reference them now
+    Input::add_key_binding(SDLK_RETURN, Input::PAD_START);
+
+    Input::add_key_binding(SDLK_z, Input::PAD_A);
+    Input::add_key_binding(SDLK_x, Input::PAD_B);
+    Input::add_key_binding(SDLK_a, Input::PAD_C);
+    Input::add_key_binding(SDLK_s, Input::PAD_D);
+
+    Input::add_key_binding(SDLK_q, Input::PAD_L1);
+    Input::add_key_binding(SDLK_w, Input::PAD_R1);
+
+    Input::add_key_binding(SDLK_LEFT, Input::PAD_LEFT);
+    Input::add_key_binding(SDLK_RIGHT, Input::PAD_RIGHT);
+    Input::add_key_binding(SDLK_UP, Input::PAD_UP);
+    Input::add_key_binding(SDLK_DOWN, Input::PAD_DOWN);
     
     bool has_quit = false;
     while (!has_quit)
@@ -100,6 +117,12 @@ int main()
             {
             case SDL_QUIT:
                 has_quit = true;
+                break;
+            case SDL_KEYDOWN:
+                Input::set_key_state(e.key.keysym.sym, true);
+                break;
+            case SDL_KEYUP:
+                Input::set_key_state(e.key.keysym.sym, false);
                 break;
             }
         }

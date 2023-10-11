@@ -1,5 +1,7 @@
+#include <input/input.h>
 #include <video/video.h>
 #include "core/sh2/sh2.h"
+#include "core/loopy_io.h"
 #include "core/memory.h"
 #include "core/system.h"
 #include "core/timing.h"
@@ -15,9 +17,14 @@ void initialize(Config::SystemInfo& config)
 	//Ensure that timing initializes before any CPUs
 	Timing::initialize();
 
+	//Initialize CPUs
 	SH2::initialize();
 
+	//Initialize MMIO
+	LoopyIO::initialize();
+
 	//Initialize subprojects after everything else
+	Input::initialize();
 	Video::initialize();
 }
 
@@ -25,6 +32,9 @@ void shutdown()
 {
 	//Shutdown all components in the reverse order they were initialized
 	Video::shutdown();
+	Input::shutdown();
+
+	LoopyIO::shutdown();
 
 	SH2::shutdown();
 
