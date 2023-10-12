@@ -124,10 +124,10 @@ static void draw_bg(int index, int screen_y)
 		int x = (screen_x + vdp.bg_scrollx[index]) & ((tilemap_width * tile_size) - 1);
 		int y = (screen_y + vdp.bg_scrolly[index]) & ((tilemap_height * tile_size) - 1);
 
-		uint16_t map_addr = map_start + ((x / tile_size) + ((y / tile_size) * tilemap_width));
+		uint16_t map_offs = (x / tile_size) + ((y / tile_size) * tilemap_width);
 
 		uint16_t descriptor;
-		memcpy(&descriptor, &vdp.tile[map_addr * 2], 2);
+		memcpy(&descriptor, &vdp.tile[map_start + (map_offs << 1)], 2);
 		descriptor = Common::bswp16(descriptor);
 
 		uint16_t tile_index = descriptor & 0x7FF;
@@ -205,7 +205,7 @@ static void draw_bitmap(int index, int y)
 		return;
 	}
 
-	int start_x = (regs->screenx + regs->clipx) & 0x1FF;
+	int start_x = regs->screenx;
 	int end_x = (regs->screenx + regs->w + 1) & 0x1FF;
 
 	bool is_8bit = false;
@@ -294,6 +294,11 @@ static void draw_bitmap(int index, int y)
 
 		//Now that the buffer control logic has been processed, the pixel can actually be drawn appropriately
 		if (!data)
+		{
+			continue;
+		}
+
+		if (x < regs->clipx)
 		{
 			continue;
 		}
@@ -434,6 +439,7 @@ static void draw_obj(int index, int screen_y)
 			int tile_index = descriptor >> 24;
 			tile_index += tile_y & ~0x7;
 			tile_index += tile_x >> 3;
+			tile_index += vdp.obj_ctrl.tile_index_offs[index] << 8;
 			uint32_t offs = (tile_x & 0x7) + ((tile_y & 0x7) * 0x08) + (tile_index << 6);
 
 			uint8_t tile_data;
