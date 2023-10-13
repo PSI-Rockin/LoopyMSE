@@ -104,6 +104,28 @@ typedef std::tuple<Timer*, int> TimerDev;
 
 static State state;
 
+static void update_timer_irq(Timer* timer)
+{
+	int subirq = -1;
+	for (int i = 0; i < 3; i++)
+	{
+		if (timer->intr_enable & timer->intr_flag & (1 << i))
+		{
+			subirq = i;
+			break;
+		}
+	}
+
+	if (subirq >= 0)
+	{
+		INTC::assert_irq(timer->irq, subirq);
+	}
+	else
+	{
+		INTC::deassert_irq(timer->irq);
+	}
+}
+
 static void intr_event(uint64_t param, int cycles_late)
 {
 	assert(!cycles_late);
@@ -140,14 +162,7 @@ static void intr_event(uint64_t param, int cycles_late)
 		timer->counter = 0;
 	}
 
-	for (int i = 0; i < 3; i++)
-	{
-		if (timer->intr_enable & timer->intr_flag & (1 << i))
-		{
-			INTC::assert_irq(timer->irq, i);
-			break;
-		}
-	}
+	update_timer_irq(timer);
 
 	//Restart the timer
 	timer->start();
@@ -267,6 +282,7 @@ void write8(uint32_t addr, uint8_t value)
 		case 0x03:
 			printf("[Timer] write timer%d intr flag: %02X\n", timer->id, value);
 			timer->intr_flag &= value;
+			update_timer_irq(timer);
 			break;
 		case 0x04:
 			printf("[Timer] write timer%d counter: %02X\n", timer->id, value);

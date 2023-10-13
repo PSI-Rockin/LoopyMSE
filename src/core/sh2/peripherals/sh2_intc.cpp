@@ -1,32 +1,77 @@
 #include <cassert>
 #include "core/sh2/peripherals/sh2_intc.h"
-#include "core/sh2/sh2.h"
+#include "core/sh2/sh2_local.h"
 
 namespace SH2::OCPM::INTC
 {
 
 struct State
 {
+	uint32_t vectors[(int)IRQ::NumIrq];
 	int prios[(int)IRQ::NumIrq];
+
+	int pending_irqs[(int)IRQ::NumIrq];
+	int irq_offs[(int)IRQ::NumIrq];
 };
 
 static State state;
 
-static int get_vector_from_irq(IRQ irq, int info)
+static void send_irq_signal()
 {
-	if (irq >= IRQ::ITU0 && irq <= IRQ::ITU4)
+	int vector = 0;
+	int highest_prio = 0;
+
+	for (int id = 0; id < (int)IRQ::NumIrq; id++)
 	{
-		int irq_index = (int)irq - (int)IRQ::ITU0;
-		return 80 + (irq_index * 4) + (info & 0x3);
+		if (state.pending_irqs[id])
+		{
+			if (state.prios[id] > highest_prio)
+			{
+				highest_prio = state.prios[id];
+				vector = state.vectors[id] + state.irq_offs[id];
+			}
+		}
 	}
 
-	assert(0);
-	return 0;
+	SH2::assert_irq(vector, highest_prio);
 }
 
 void initialize()
 {
 	state = {};
+
+	//NMI and UserBreak have fixed priorities, everything else is configurable
+	state.prios[(int)IRQ::NMI] = 16;
+	state.prios[(int)IRQ::UserBreak] = 15;
+
+	state.vectors[(int)IRQ::NMI] = 11;
+	state.vectors[(int)IRQ::UserBreak] = 12;
+
+	for (int i = 0; i < 8; i++)
+	{
+		int id = (int)IRQ::IRQ0;
+		state.vectors[id + i] = 64 + i;
+	}
+
+	for (int i = 0; i < 4; i++)
+	{
+		int id = (int)IRQ::DMAC0;
+		state.vectors[id + i] = 72 + (i * 4);
+	}
+
+	for (int i = 0; i < 5; i++)
+	{
+		int id = (int)IRQ::ITU0;
+		state.vectors[id + i] = 80 + (i * 4);
+	}
+
+	for (int i = 0; i < 2; i++)
+	{
+		int id = (int)IRQ::SCI0;
+		state.vectors[id + i] = 100 + (i * 4);
+	}
+
+	//TODO: remaining interrupts
 }
 
 uint16_t read16(uint32_t addr)
@@ -52,13 +97,17 @@ void write16(uint32_t addr, uint16_t value)
 	}
 }
 
-void assert_irq(IRQ irq, int info)
+void assert_irq(IRQ irq, int vector_offs)
 {
-	//TODO: if multiple IRQs have been asserted, the INTC should store the IRQs and attempt to send the highest priority one to the CPU
-	int vector_id = get_vector_from_irq(irq, info);
-	int prio = state.prios[(int)irq];
+	state.pending_irqs[(int)irq] = true;
+	state.irq_offs[(int)irq] = vector_offs;
+	send_irq_signal();
+}
 
-	SH2::raise_irq(vector_id, prio);
+void deassert_irq(IRQ irq)
+{
+	state.pending_irqs[(int)irq] = false;
+	send_irq_signal();
 }
 
 }

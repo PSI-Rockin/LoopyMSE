@@ -64,7 +64,7 @@ static void set_control_reg(int index, uint32_t value)
 	switch (index)
 	{
 	case 0:
-		sh2.sr = value;
+		set_sr(value);
 		break;
 	case 1:
 		sh2.gbr = value;
@@ -1030,10 +1030,11 @@ static void rte(uint16_t instr)
 	uint32_t new_pc = Bus::read32(sh2.gpr[15]);
 	sh2.gpr[15] += 4;
 
-	sh2.sr = Bus::read32(sh2.gpr[15]) & 0x3F3;
+	uint32_t new_sr = Bus::read32(sh2.gpr[15]);
 	sh2.gpr[15] += 4;
 
 	handle_jump(new_pc, true);
+	set_sr(new_sr);
 }
 
 static void sett(uint16_t instr)

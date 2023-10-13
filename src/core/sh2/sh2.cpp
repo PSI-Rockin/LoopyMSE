@@ -17,6 +17,31 @@ namespace SH2
 
 CPU sh2;
 
+static Timing::FuncHandle irq_func;
+static Timing::EventHandle irq_ev;
+
+static bool can_exec_irq()
+{
+	int imask = (sh2.sr >> 4) & 0xF;
+	return sh2.pending_irq_prio > imask;
+}
+
+static void handle_irq(uint64_t param, int cycles_late)
+{
+	if (!can_exec_irq())
+	{
+		return;
+	}
+
+	raise_exception(sh2.pending_irq_vector);
+
+	int new_imask = std::clamp(sh2.pending_irq_prio, 0, 15);
+
+	//Interrupt mask should only be modified after the above function so that the original value can be pushed onto the stack
+	sh2.sr &= ~0xF0;
+	sh2.sr |= new_imask << 4;
+}
+
 void initialize()
 {
 	sh2 = {};
@@ -27,6 +52,8 @@ void initialize()
 	set_pc(0x0E000480);
 
 	Timing::register_timer(Timing::CPU_TIMER, &sh2.cycles_left, run);
+
+	irq_func = Timing::register_func("SH2::handle_irq", handle_irq);
 
 	//Set up on-chip peripheral modules after CPU is done
 	OCPM::DMAC::initialize();
@@ -51,17 +78,22 @@ void run()
 	}
 }
 
-void raise_irq(int vector_id, int prio)
+void assert_irq(int vector_id, int prio)
 {
-	int imask = (sh2.sr >> 4) & 0xF;
-	assert(prio > imask);
+	sh2.pending_irq_vector = vector_id;
+	sh2.pending_irq_prio = prio;
+	irq_check();
+}
 
-	raise_exception(vector_id);
+void irq_check()
+{
+	if (!can_exec_irq())
+	{
+		return;
+	}
 
-	//Interrupt mask should only be modified after the above function so that the original value can be pushed onto the stack
-	prio = std::clamp(prio, 0, 15);
-	sh2.sr &= ~0xF0;
-	sh2.sr |= prio << 4;
+	//Ensure the interrupt occurs after the CPU has executed
+	Timing::add_event(irq_func, Timing::convert_cpu(1), 0, Timing::CPU_TIMER);
 }
 
 void raise_exception(int vector_id)
@@ -84,6 +116,12 @@ void set_pc(uint32_t new_pc)
 {
 	//Needs to be + 4 to account for pipelining
 	sh2.pc = new_pc + 4;
+}
+
+void set_sr(uint32_t new_sr)
+{
+	sh2.sr = new_sr & 0x3F3;
+	irq_check();
 }
 
 }

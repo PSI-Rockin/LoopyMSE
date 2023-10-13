@@ -15,9 +15,18 @@ struct CPU
 
 	int32_t cycles_left;
 
+	int pending_irq_prio;
+	int pending_irq_vector;
+
 	uint8_t** pagetable;
 };
 
 extern CPU sh2;
+
+void assert_irq(int vector_id, int prio);
+void irq_check();
+void raise_exception(int vector_id);
+void set_pc(uint32_t new_pc);
+void set_sr(uint32_t new_sr);
 
 }
