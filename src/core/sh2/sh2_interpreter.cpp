@@ -544,6 +544,28 @@ static void cmppz(uint16_t instr)
 	SET_T(result);
 }
 
+static void cmpstr(uint16_t instr)
+{
+	uint32_t reg1 = (instr >> 4) & 0xF;
+	uint32_t reg2 = (instr >> 8) & 0xF;
+
+	uint32_t value1 = sh2.gpr[reg1];
+	uint32_t value2 = sh2.gpr[reg2];
+
+	for (int i = 0; i < 4; i++)
+	{
+		if ((value1 & 0xFF) == (value2 & 0xFF))
+		{
+			SET_T(true);
+			return;
+		}
+		value1 >>= 8;
+		value2 >>= 8;
+	}
+
+	SET_T(false);
+}
+
 static void div1(uint16_t instr)
 {
 	uint32_t denom = (instr >> 4) & 0xF;
@@ -741,6 +763,14 @@ static void andb_gbrrel(uint16_t instr)
 	uint32_t addr = sh2.gbr + sh2.gpr[0];
 	uint8_t val = Bus::read8(addr);
 	Bus::write8(addr, val & imm);
+}
+
+static void not_reg(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	sh2.gpr[dst] = ~sh2.gpr[src];
 }
 
 static void or_reg(uint16_t instr)
@@ -1279,6 +1309,10 @@ void run(uint16_t instr)
 	{
 		cmppz(instr);
 	}
+	else if ((instr & 0xF00F) == 0x200C)
+	{
+		cmpstr(instr);
+	}
 	else if ((instr & 0xF00F) == 0x3004)
 	{
 		div1(instr);
@@ -1342,6 +1376,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xFF00) == 0xCD00)
 	{
 		andb_gbrrel(instr);
+	}
+	else if ((instr & 0xF00F) == 0x6007)
+	{
+		not_reg(instr);
 	}
 	else if ((instr & 0xF00F) == 0x200B)
 	{
