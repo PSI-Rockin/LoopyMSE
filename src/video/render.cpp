@@ -269,13 +269,6 @@ static void draw_bitmap(int index, int y)
 			}
 		}
 
-		uint8_t output = data;
-		if (!is_8bit)
-		{
-			int pal = (vdp.bitmap_palsel >> ((3 - index) * 4)) & 0xF;
-			output |= pal << 4;
-		}
-
 		if (regs->buffer_ctrl & 0x100)
 		{
 			if (data == 0xFF)
@@ -318,6 +311,13 @@ static void draw_bitmap(int index, int y)
 			}
 		}
 
+		uint8_t output = data;
+		if (!is_8bit)
+		{
+			int pal = (vdp.bitmap_palsel >> ((3 - index) * 4)) & 0xF;
+			output |= pal << 4;
+		}
+
 		int pair_index = index >> 1;
 		int output_mode = vdp.layer_ctrl.bitmap_screen_mode[pair_index];
 
@@ -348,7 +348,7 @@ static void draw_obj(int index, int screen_y)
 	uint32_t data_start = 0x1000;
 
 	//OBJ #0 has highest priority, so the loop must be backwards
-	for (int id = OBJ_COUNT; id >= 0; id--)
+	for (int id = OBJ_COUNT - 1; id >= 0; id--)
 	{
 		int test_id = (id - vdp.obj_ctrl.id_offs) & 0xFF;
 		if (index == 0 && test_id >= OBJ_COUNT)
