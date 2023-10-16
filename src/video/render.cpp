@@ -8,6 +8,14 @@
 namespace Video::Renderer
 {
 
+struct TilemapInfo
+{
+	int width;
+	int height;
+	uint32_t bg1_start;
+	uint32_t data_start;
+};
+
 static uint16_t read_palette(uint8_t value)
 {
 	uint16_t color;
@@ -73,6 +81,42 @@ static int get_bg_tile_size(int index)
 	return tile_size;
 }
 
+static void get_tilemap_info(TilemapInfo& info)
+{
+	switch (vdp.bg_ctrl.map_size)
+	{
+	case 0x00:
+		info.width = 64;
+		info.height = 64;
+		break;
+	case 0x01:
+		info.width = 64;
+		info.height = 32;
+		break;
+	case 0x02:
+		info.width = 32;
+		info.height = 64;
+		break;
+	case 0x03:
+		info.width = 32;
+		info.height = 32;
+		break;
+	default:
+		assert(0);
+	}
+
+	info.data_start = (info.width * info.height) << 1;
+	if (vdp.bg_ctrl.shared_maps)
+	{
+		info.bg1_start = 0;
+	}
+	else
+	{
+		info.bg1_start = info.data_start;
+		info.data_start <<= 1;
+	}
+}
+
 static void draw_bg(int index, int screen_y)
 {
 	if (!vdp.layer_ctrl.bg_enable[index])
@@ -84,47 +128,17 @@ static void draw_bg(int index, int screen_y)
 	int tile_size = get_bg_tile_size(index);
 	int tile_size_mask = tile_size - 1;
 
-	int tilemap_width = 0, tilemap_height = 0;
-	switch (vdp.bg_ctrl.map_size)
-	{
-	case 0x00:
-		tilemap_width = 64;
-		tilemap_height = 64;
-		break;
-	case 0x01:
-		tilemap_width = 64;
-		tilemap_height = 32;
-		break;
-	case 0x02:
-		tilemap_width = 32;
-		tilemap_height = 64;
-		break;
-	case 0x03:
-		tilemap_width = 32;
-		tilemap_height = 32;
-		break;
-	default:
-		assert(0);
-	}
+	TilemapInfo tilemap;
+	get_tilemap_info(tilemap);
 
-	uint32_t map_start;
-	uint32_t data_start = (tilemap_width * tilemap_height) << 1;
-	if (!vdp.bg_ctrl.shared_maps)
-	{
-		map_start = (index == 1) ? data_start : 0;
-		data_start <<= 1;
-	}
-	else
-	{
-		map_start = 0;
-	}
+	uint32_t map_start = (index == 1) ? tilemap.bg1_start : 0;;
 
 	for (int screen_x = 0; screen_x < 0x100; screen_x++)
 	{
-		int x = (screen_x + vdp.bg_scrollx[index]) & ((tilemap_width * tile_size) - 1);
-		int y = (screen_y + vdp.bg_scrolly[index]) & ((tilemap_height * tile_size) - 1);
+		int x = (screen_x + vdp.bg_scrollx[index]) & ((tilemap.width * tile_size) - 1);
+		int y = (screen_y + vdp.bg_scrolly[index]) & ((tilemap.height * tile_size) - 1);
 
-		uint16_t map_offs = (x / tile_size) + ((y / tile_size) * tilemap_width);
+		uint16_t map_offs = (x / tile_size) + ((y / tile_size) * tilemap.width);
 
 		uint16_t descriptor;
 		memcpy(&descriptor, &vdp.tile[map_start + (map_offs << 1)], 2);
@@ -155,13 +169,13 @@ static void draw_bg(int index, int screen_y)
 		uint8_t tile_data;
 		if (is_8bit)
 		{
-			tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
+			tile_data = vdp.tile[(tilemap.data_start + offs) & 0xFFFF];
 		}
 		else
 		{
 			offs >>= 1;
 			offs += vdp.tilebase << 9;
-			tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
+			tile_data = vdp.tile[(tilemap.data_start + offs) & 0xFFFF];
 			if (tile_x & 0x1)
 			{
 				tile_data &= 0xF;
@@ -344,8 +358,9 @@ static void draw_obj(int index, int screen_y)
 
 	//TODO: limit the maximum number of sprites per scanline
 
-	//TODO: calculate this from the same way it's done for BGs
-	uint32_t data_start = 0x1000;
+	//Tilemap info is only useful here to get the start of tile data
+	TilemapInfo tilemap;
+	get_tilemap_info(tilemap);
 
 	//OBJ #0 has highest priority, so the loop must be backwards
 	for (int id = OBJ_COUNT - 1; id >= 0; id--)
@@ -445,13 +460,13 @@ static void draw_obj(int index, int screen_y)
 			uint8_t tile_data;
 			if (vdp.obj_ctrl.is_8bit)
 			{
-				tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
+				tile_data = vdp.tile[(tilemap.data_start + offs) & 0xFFFF];
 			}
 			else
 			{
 				offs >>= 1;
 				offs += vdp.tilebase << 9;
-				tile_data = vdp.tile[(data_start + offs) & 0xFFFF];
+				tile_data = vdp.tile[(tilemap.data_start + offs) & 0xFFFF];
 				if (tile_x & 0x1)
 				{
 					tile_data &= 0xF;
