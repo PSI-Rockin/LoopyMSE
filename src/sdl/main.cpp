@@ -63,29 +63,42 @@ void update(uint16_t* display_output)
 
 }
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc < 3)
+    {
+        printf("Args: [game ROM] [BIOS]\n");
+        return 1;
+    }
+
     SDL::initialize();
+
+    char* cart_name = argv[1];
+    char* bios_name = argv[2];
 
     Config::SystemInfo config = {};
 
-    std::ifstream cart_file("D:/anime_land_be.bin", std::ios::binary);
+    std::ifstream cart_file(cart_name, std::ios::binary);
     if (!cart_file.is_open())
     {
+        printf("Failed to open %s\n", cart_name);
         return 1;
     }
 
     config.cart_rom.assign(std::istreambuf_iterator<char>(cart_file), {});
     cart_file.close();
 
-    std::ifstream bios_file("D:/loopy_bios.bin", std::ios::binary);
+    std::ifstream bios_file(bios_name, std::ios::binary);
     if (!bios_file.is_open())
     {
+        printf("Failed to open %s\n", bios_name);
         return 1;
     }
 
     config.bios_rom.assign(std::istreambuf_iterator<char>(bios_file), {});
     bios_file.close();
+
+    //Initialize the emulator and all of its subprojects
     System::initialize(config);
 
     //All subprojects have been initialized, so it is safe to reference them now
