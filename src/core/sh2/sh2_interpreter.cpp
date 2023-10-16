@@ -409,6 +409,18 @@ static void movt(uint16_t instr)
 	sh2.gpr[reg] = GET_T();
 }
 
+static void swapb(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	uint32_t hi_bits = sh2.gpr[src] & 0xFFFF0000;
+	uint32_t byte0 = sh2.gpr[src] & 0xFF;
+	uint32_t byte1 = (sh2.gpr[src] >> 8) & 0xFF;
+
+	sh2.gpr[dst] = hi_bits | (byte0 << 8) | byte1;
+}
+
 static void swapw(uint16_t instr)
 {
 	uint32_t src = (instr >> 4) & 0xF;
@@ -1252,6 +1264,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF0FF) == 0x0029)
 	{
 		movt(instr);
+	}
+	else if ((instr & 0xF00F) == 0x6008)
+	{
+		swapb(instr);
 	}
 	else if ((instr & 0xF00F) == 0x6009)
 	{
