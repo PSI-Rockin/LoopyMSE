@@ -22,3 +22,7 @@ Only hardcoded keyboard keys for the time being:
 | Left | Left |
 | Right | Right |
 | Start | Enter/Return |
+
+## Special Thanks
+kasami - dumping the BIOS, HW testing, and many other valuable non-code contributions
+UBCH server - translations and moral support
