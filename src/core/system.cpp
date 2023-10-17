@@ -12,7 +12,7 @@ namespace System
 void initialize(Config::SystemInfo& config)
 {
 	//Memory must initialize first
-	Memory::initialize(config.bios_rom, config.cart_rom);
+	Memory::initialize(config.bios_rom, config.cart_rom, config.cart_sram);
 
 	//Ensure that timing initializes before any CPUs
 	Timing::initialize();

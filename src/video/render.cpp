@@ -133,7 +133,7 @@ static void draw_bg(int index, int screen_y)
 
 	uint32_t map_start = (index == 1) ? tilemap.bg1_start : 0;;
 
-	for (int screen_x = 0; screen_x < 0x100; screen_x++)
+	for (int screen_x = 0; screen_x < DISPLAY_WIDTH; screen_x++)
 	{
 		int x = (screen_x + vdp.bg_scrollx[index]) & ((tilemap.width * tile_size) - 1);
 		int y = (screen_y + vdp.bg_scrolly[index]) & ((tilemap.height * tile_size) - 1);
@@ -659,7 +659,7 @@ static void display_capture(int y)
 	{
 	case 0x03:
 		//Capture screen A before applying the palette
-		memcpy(vdp.capture_buffer, vdp.screens[0], 0x100);
+		memcpy(vdp.capture_buffer, vdp.screens[0], DISPLAY_WIDTH * sizeof(uint8_t));
 		break;
 	default:
 		assert(0);

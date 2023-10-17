@@ -17,7 +17,7 @@ constexpr static int MMIO_START = 0x05000000;
 
 constexpr static int CART_START = 0x06000000;
 
-void initialize(std::vector<uint8_t>& bios_rom, std::vector<uint8_t>& cart_rom);
+void initialize(std::vector<uint8_t>& bios_rom, std::vector<uint8_t>& cart_rom, std::vector<uint8_t>& cart_sram);
 void shutdown();
 
 void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size);

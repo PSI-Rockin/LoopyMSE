@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <SDL.h>
+#include <common/bswp.h>
 #include <core/config.h>
 #include <core/system.h>
 #include <input/input.h>
@@ -97,6 +98,17 @@ int main(int argc, char** argv)
 
     config.bios_rom.assign(std::istreambuf_iterator<char>(bios_file), {});
     bios_file.close();
+
+    //Determine the size of SRAM from the cartridge header
+    uint32_t sram_start, sram_end;
+    memcpy(&sram_start, config.cart_rom.data() + 0x10, 4);
+    memcpy(&sram_end, config.cart_rom.data() + 0x14, 4);
+    uint32_t sram_size = Common::bswp32(sram_end) - Common::bswp32(sram_start) + 1;
+
+    //Initialize SRAM to all 0xFFs
+    //TODO: load this from a file
+    config.cart_sram.resize(sram_size);
+    std::fill(config.cart_sram.begin(), config.cart_sram.end(), 0xFF);
 
     //Initialize the emulator and all of its subprojects
     System::initialize(config);

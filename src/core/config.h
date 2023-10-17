@@ -9,6 +9,7 @@ struct SystemInfo
 {
 	std::vector<uint8_t> bios_rom;
 	std::vector<uint8_t> cart_rom;
+	std::vector<uint8_t> cart_sram;
 };
 
 }

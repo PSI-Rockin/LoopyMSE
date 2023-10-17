@@ -182,7 +182,9 @@ void initialize()
 	vdp.display_output = std::make_unique<uint16_t[]>(DISPLAY_WIDTH * DISPLAY_HEIGHT);
 
 	//Map VRAM to the CPU
+	//Bitmap VRAM is mirrored
 	Memory::map_sh2_pagetable(vdp.bitmap, BITMAP_VRAM_START, BITMAP_VRAM_SIZE);
+	Memory::map_sh2_pagetable(vdp.bitmap, BITMAP_VRAM_START + BITMAP_VRAM_SIZE, BITMAP_VRAM_SIZE);
 	Memory::map_sh2_pagetable(vdp.tile, TILE_VRAM_START, TILE_VRAM_SIZE);
 
 	vcount_func = Timing::register_func("Video::inc_vcount", inc_vcount);
