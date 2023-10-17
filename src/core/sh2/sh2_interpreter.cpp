@@ -894,6 +894,14 @@ static void rotcr(uint16_t instr)
 	SET_T(new_t);
 }
 
+static void shal(uint16_t instr)
+{
+	uint32_t reg = (instr >> 8) & 0xF;
+
+	SET_T(sh2.gpr[reg] >> 31);
+	sh2.gpr[reg] <<= 1;
+}
+
 static void shar(uint16_t instr)
 {
 	uint32_t reg = (instr >> 8) & 0xF;
@@ -1444,6 +1452,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF0FF) == 0x4025)
 	{
 		rotcr(instr);
+	}
+	else if ((instr & 0xF0FF) == 0x4020)
+	{
+		shal(instr);
 	}
 	else if ((instr & 0xF0FF) == 0x4021)
 	{
