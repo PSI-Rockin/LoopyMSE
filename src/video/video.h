@@ -39,6 +39,9 @@ constexpr static int BGOBJ_REG_END = 0x0405B000;
 constexpr static int DISPLAY_REG_START = 0x0405B000;
 constexpr static int DISPLAY_REG_END = 0x0405C000;
 
+constexpr static int IRQ_REG_START = 0x0405C000;
+constexpr static int IRQ_REG_END = 0x0405D000;
+
 constexpr static int DMA_CTRL_START = 0x0405E000;
 constexpr static int DMA_CTRL_END = 0x0405F000;
 
@@ -113,6 +116,14 @@ uint32_t display_read32(uint32_t addr);
 void display_write8(uint32_t addr, uint8_t value);
 void display_write16(uint32_t addr, uint16_t value);
 void display_write32(uint32_t addr, uint32_t value);
+
+uint8_t irq_read8(uint32_t addr);
+uint16_t irq_read16(uint32_t addr);
+uint32_t irq_read32(uint32_t addr);
+
+void irq_write8(uint32_t addr, uint8_t value);
+void irq_write16(uint32_t addr, uint16_t value);
+void irq_write32(uint32_t addr, uint32_t value);
 
 uint8_t dma_ctrl_read8(uint32_t addr);
 uint16_t dma_ctrl_read16(uint32_t addr);

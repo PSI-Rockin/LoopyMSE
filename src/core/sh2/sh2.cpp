@@ -20,22 +20,25 @@ CPU sh2;
 static Timing::FuncHandle irq_func;
 static Timing::EventHandle irq_ev;
 
-static bool can_exec_irq()
+static bool can_exec_irq(int prio)
 {
 	int imask = (sh2.sr >> 4) & 0xF;
-	return sh2.pending_irq_prio > imask;
+	return prio > imask;
 }
 
 static void handle_irq(uint64_t param, int cycles_late)
 {
-	if (!can_exec_irq())
+	int prio = param & 0xFF;
+	int vector = param >> 8;
+
+	if (!can_exec_irq(prio))
 	{
 		return;
 	}
 
-	raise_exception(sh2.pending_irq_vector);
+	raise_exception(vector);
 
-	int new_imask = std::clamp(sh2.pending_irq_prio, 0, 15);
+	int new_imask = std::clamp(prio, 0, 15);
 
 	//Interrupt mask should only be modified after the above function so that the original value can be pushed onto the stack
 	sh2.sr &= ~0xF0;
@@ -87,18 +90,19 @@ void assert_irq(int vector_id, int prio)
 
 void irq_check()
 {
-	if (!can_exec_irq())
+	if (!can_exec_irq(sh2.pending_irq_prio))
 	{
 		return;
 	}
 
 	//Ensure the interrupt occurs after the CPU has executed
-	Timing::add_event(irq_func, Timing::convert_cpu(1), 0, Timing::CPU_TIMER);
+	uint64_t param = sh2.pending_irq_prio | (sh2.pending_irq_vector << 8);
+	Timing::add_event(irq_func, Timing::convert_cpu(1), param, Timing::CPU_TIMER);
 }
 
 void raise_exception(int vector_id)
 {
-	assert(vector_id >= 0x40 && vector_id < 0x100);
+	assert(vector_id < 0x100);
 
 	//Push SR and PC onto the stack
 	sh2.gpr[15] -= 4;

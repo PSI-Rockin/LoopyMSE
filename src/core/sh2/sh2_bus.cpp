@@ -40,6 +40,8 @@ static uint32_t translate_addr(uint32_t addr)
 		return Video::bgobj_##access(__VA_ARGS__);							\
 	if (addr >= Video::DISPLAY_REG_START && addr < Video::DISPLAY_REG_END)	\
 		return Video::display_##access(__VA_ARGS__);						\
+	if (addr >= Video::IRQ_REG_START && addr < Video::IRQ_REG_END)			\
+		return Video::irq_##access(__VA_ARGS__);							\
 	if (addr >= LoopyIO::BASE_ADDR && addr < LoopyIO::END_ADDR)				\
 		return LoopyIO::reg_##access(__VA_ARGS__);							\
 	if (addr >= Video::DMA_CTRL_START && addr < Video::DMA_CTRL_END)		\

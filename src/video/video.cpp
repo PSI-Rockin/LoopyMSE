@@ -3,6 +3,7 @@
 #include <cstring>
 #include <fstream>
 #include <common/bswp.h>
+#include <core/sh2/peripherals/sh2_intc.h>
 #include <core/memory.h>
 #include <core/timing.h>
 #include "video/render.h"
@@ -16,6 +17,8 @@ static Timing::FuncHandle vcount_func, hsync_func;
 static Timing::EventHandle vcount_ev, hsync_ev;
 
 VDP vdp;
+
+constexpr static int LINES_PER_FRAME = 263;
 
 struct DumpHeader
 {
@@ -101,6 +104,29 @@ static void start_hsync(uint64_t param, int cycles_late)
 	vdp.hcount |= 0x100;
 }
 
+static void vsync_start()
+{
+	printf("[Video] VSYNC start\n");
+
+	//This is kinda weird, but when the VDP enters VSYNC, the total number of scanlines is subtracted from VCOUNT
+	//Think of the VSYNC lines as being negative
+	vdp.vcount = (vdp.vcount - LINES_PER_FRAME) & 0x1FF;
+	vdp.frame_ended = true;
+
+	//NMI is triggered on VSYNC
+	if (vdp.cmp_irq_ctrl.nmi_enable)
+	{
+		//TODO: is there a cleaner way to do this?
+		auto irq_id = SH2::OCPM::INTC::IRQ::NMI;
+		SH2::OCPM::INTC::assert_irq(irq_id, 0);
+		SH2::OCPM::INTC::deassert_irq(irq_id);
+	}
+
+	dump_bmp("output_display", vdp.display_output);
+	//dump_all_bmps();
+	//dump_for_serial();
+}
+
 static void inc_vcount(uint64_t param, int cycles_late)
 {
 	//Leave HSYNC
@@ -113,15 +139,9 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	vdp.vcount++;
 	
 	//Once we go past the visible region, enter VSYNC
-	constexpr static int VSYNC_START = 0x1D9;
 	if (vdp.vcount == DISPLAY_HEIGHT)
 	{
-		printf("[Video] VSYNC start\n");
-		vdp.vcount = VSYNC_START;
-		vdp.frame_ended = true;
-		dump_bmp("output_display", vdp.display_output);
-		//dump_all_bmps();
-		//dump_for_serial();
+		vsync_start();
 	}
 
 	//At the end of VSYNC, wrap around to the start of the visible region
@@ -131,8 +151,6 @@ static void inc_vcount(uint64_t param, int cycles_late)
 		printf("[Video] VSYNC end\n");
 		vdp.vcount = 0;
 	}
-
-	constexpr static int LINES_PER_FRAME = DISPLAY_HEIGHT + (VSYNC_END - VSYNC_START);
 
 	constexpr static int CYCLES_PER_FRAME = Timing::F_CPU / 60;
 	constexpr static int CYCLES_PER_LINE = CYCLES_PER_FRAME / LINES_PER_FRAME;
@@ -768,6 +786,67 @@ void display_write16(uint32_t addr, uint16_t value)
 }
 
 void display_write32(uint32_t addr, uint32_t value)
+{
+	assert(0);
+}
+
+uint8_t irq_read8(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+uint16_t irq_read16(uint32_t addr)
+{
+	addr &= 0xFFF;
+	
+	switch (addr)
+	{
+	case 0x002:
+		return vdp.irq0_hcmp;
+	case 0x004:
+		return vdp.irq0_vcmp;
+	default:
+		assert(0);
+		return 0;
+	}
+}
+
+uint32_t irq_read32(uint32_t addr)
+{
+	assert(0);
+	return 0;
+}
+
+void irq_write8(uint32_t addr, uint8_t value)
+{
+	assert(0);
+}
+
+void irq_write16(uint32_t addr, uint16_t value)
+{
+	addr &= 0xFFF;
+
+	switch (addr)
+	{
+	case 0x000:
+		//TODO: emulate IRQ0, a screen position compare interrupt (no game uses it, but homebrew might)
+		vdp.cmp_irq_ctrl.irq0_enable = (value >> 1) & 0x1;
+		vdp.cmp_irq_ctrl.nmi_enable = (value >> 2) & 0x1;
+		vdp.cmp_irq_ctrl.use_vcmp = (value >> 5) & 0x1;
+		vdp.cmp_irq_ctrl.irq0_enable2 = (value >> 7) & 0x1;
+		printf("[VDP] write CMP_IRQ_CTRL: %04X\n", value);
+		break;
+	case 0x002:
+		vdp.irq0_hcmp = value & 0x1FF;
+		break;
+	case 0x004:
+		vdp.irq0_vcmp = value & 0x1FF;
+		break;
+	}
+}
+
+void irq_write32(uint32_t addr, uint32_t value)
 {
 	assert(0);
 }

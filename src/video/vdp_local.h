@@ -122,6 +122,19 @@ struct VDP
 
 	CaptureCtrl capture_ctrl;
 
+	//IRQ control registers (not to be confused with 58008) - 0x0C05Cxxx
+	struct CmpIrqCtrl
+	{
+		int irq0_enable;
+		int nmi_enable;
+		int use_vcmp;
+		int irq0_enable2;
+	};
+
+	CmpIrqCtrl cmp_irq_ctrl;
+	uint16_t irq0_hcmp;
+	uint16_t irq0_vcmp;
+
 	//DMA ctrl registers - 0x0C05Exxx
 	uint16_t dma_mask;
 	uint16_t dma_value;
