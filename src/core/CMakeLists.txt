@@ -1,4 +1,6 @@
 add_library (core STATIC
+			 "cart.cpp"
+			 "cart.h"
 			 "config.h"
 			 "loopy_io.cpp"
 			 "loopy_io.h"

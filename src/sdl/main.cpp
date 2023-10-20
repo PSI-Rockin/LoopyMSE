@@ -1,7 +1,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+
 #include <SDL.h>
+
 #include <common/bswp.h>
 #include <core/config.h>
 #include <core/system.h>
@@ -64,6 +66,17 @@ void update(uint16_t* display_output)
 
 }
 
+std::string remove_extension(std::string file_path)
+{
+    auto pos = file_path.find(".");
+    if (pos == std::string::npos)
+    {
+        return file_path;
+    }
+
+    return file_path.substr(0, pos);
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 3)
@@ -74,25 +87,25 @@ int main(int argc, char** argv)
 
     SDL::initialize();
 
-    char* cart_name = argv[1];
-    char* bios_name = argv[2];
+    std::string cart_name = argv[1];
+    std::string bios_name = argv[2];
 
     Config::SystemInfo config = {};
 
     std::ifstream cart_file(cart_name, std::ios::binary);
     if (!cart_file.is_open())
     {
-        printf("Failed to open %s\n", cart_name);
+        printf("Failed to open %s\n", cart_name.c_str());
         return 1;
     }
 
-    config.cart_rom.assign(std::istreambuf_iterator<char>(cart_file), {});
+    config.cart.rom.assign(std::istreambuf_iterator<char>(cart_file), {});
     cart_file.close();
 
     std::ifstream bios_file(bios_name, std::ios::binary);
     if (!bios_file.is_open())
     {
-        printf("Failed to open %s\n", bios_name);
+        printf("Failed to open %s\n", bios_name.c_str());
         return 1;
     }
 
@@ -101,14 +114,28 @@ int main(int argc, char** argv)
 
     //Determine the size of SRAM from the cartridge header
     uint32_t sram_start, sram_end;
-    memcpy(&sram_start, config.cart_rom.data() + 0x10, 4);
-    memcpy(&sram_end, config.cart_rom.data() + 0x14, 4);
+    memcpy(&sram_start, config.cart.rom.data() + 0x10, 4);
+    memcpy(&sram_end, config.cart.rom.data() + 0x14, 4);
     uint32_t sram_size = Common::bswp32(sram_end) - Common::bswp32(sram_start) + 1;
 
-    //Initialize SRAM to all 0xFFs
-    //TODO: load this from a file
-    config.cart_sram.resize(sram_size);
-    std::fill(config.cart_sram.begin(), config.cart_sram.end(), 0xFF);
+    //Attempt to load SRAM from a file
+    config.cart.sram_file_path = remove_extension(cart_name) + ".sav";
+    std::ifstream sram_file(config.cart.sram_file_path, std::ios::binary);
+    if (!sram_file.is_open())
+    {
+        printf("Warning: SRAM not found\n");
+    }
+    else
+    {
+        printf("Successfully found SRAM\n");
+        config.cart.sram.assign(std::istreambuf_iterator<char>(sram_file), {});
+        sram_file.close();
+    }
+
+    //Ensure SRAM is at the proper size. If no file is loaded, it will be filled with 0xFF.
+    //If a file was loaded but was smaller than the SRAM size, the uninitialized bytes will be 0xFF.
+    //If the file was larger, then the vector size is clamped
+    config.cart.sram.resize(sram_size, 0xFF);
 
     //Initialize the emulator and all of its subprojects
     System::initialize(config);

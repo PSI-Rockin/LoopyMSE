@@ -1,6 +1,7 @@
 #include <input/input.h>
 #include <video/video.h>
 #include "core/sh2/sh2.h"
+#include "core/cart.h"
 #include "core/loopy_io.h"
 #include "core/memory.h"
 #include "core/system.h"
@@ -12,7 +13,7 @@ namespace System
 void initialize(Config::SystemInfo& config)
 {
 	//Memory must initialize first
-	Memory::initialize(config.bios_rom, config.cart_rom, config.cart_sram);
+	Memory::initialize(config.bios_rom);
 
 	//Ensure that timing initializes before any CPUs
 	Timing::initialize();
@@ -20,7 +21,8 @@ void initialize(Config::SystemInfo& config)
 	//Initialize CPUs
 	SH2::initialize();
 
-	//Initialize MMIO
+	//Initialize core hardware
+	Cart::initialize(config.cart);
 	LoopyIO::initialize();
 
 	//Initialize subprojects after everything else
@@ -35,6 +37,7 @@ void shutdown()
 	Input::shutdown();
 
 	LoopyIO::shutdown();
+	Cart::shutdown();
 
 	SH2::shutdown();
 
@@ -64,6 +67,8 @@ void run()
 			Timing::process_slice(i, slice_length);
 		}
 	}
+
+	Cart::sram_commit_check();
 }
 
 uint16_t* get_display_output()
