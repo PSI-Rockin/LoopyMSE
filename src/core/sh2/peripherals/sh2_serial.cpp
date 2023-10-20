@@ -150,7 +150,11 @@ void initialize()
 
 uint8_t read8(uint32_t addr)
 {
-	assert(0);
+	addr &= 0xF;
+	Port* port = &state.ports[addr >> 3];
+	int reg = addr & 0x7;
+
+	printf("[Serial] read port%d reg%d\n", port->id, reg);
 	return 0;
 }
 
@@ -211,6 +215,10 @@ void write8(uint32_t addr, uint8_t value)
 			port->status.tx_empty = false;
 			DMAC::clear_dreq(port->tx_dreq_id);
 		}
+		break;
+	case 0x04:
+		//TODO
+		printf("[Serial write port%d status: %02X\n", port->id, value);
 		break;
 	default:
 		assert(0);
