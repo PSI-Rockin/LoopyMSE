@@ -4,6 +4,8 @@ A Casio Loopy emulator. WIP, but able to run some games.
 ## How to use
 LoopyMSE must be launched from the command line with these arguments: [game ROM] [BIOS]
 
+The emulator will automatically load .sav files with the same name as the game ROM. If no .sav file exists, the emulator will create one. Specifying the save file to use in the command line may be added at a future date.
+
 NOTE: all files must be in big-endian format.
 
 ## Controls
