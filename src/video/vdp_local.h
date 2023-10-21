@@ -15,6 +15,7 @@ struct VDP
 	std::unique_ptr<uint16_t[]> display_output;
 
 	int frame_ended;
+	int visible_scanlines; //Configured by VDP_MODE
 
 	//Screen A is 0, Screen B is 1
 	uint8_t screens[2][DISPLAY_WIDTH];
@@ -36,7 +37,18 @@ struct VDP
 
 	//Control registers - 0x0C058xxx
 
-	uint16_t unk_58000;
+	struct Mode
+	{
+		int use_pal;
+		int extra_scanlines;
+		int unk;
+		int mouse_scan;
+		int pad_scan;
+		int unk2;
+	};
+
+	Mode mode;
+
 	uint16_t hcount;
 	uint16_t vcount;
 	

@@ -76,8 +76,22 @@ void initialize()
 
 uint16_t read16(uint32_t addr)
 {
-	assert(0);
-	return 0;
+	addr &= 0xF;
+
+	switch (addr)
+	{
+	case 0x08:
+	{
+		uint16_t result = state.prios[(int)IRQ::ITU1];
+		result |= state.prios[(int)IRQ::ITU0] << 4;
+		result |= state.prios[(int)IRQ::DMAC2] << 8;
+		result |= state.prios[(int)IRQ::DMAC0] << 12;
+		return result;
+	}
+	default:
+		assert(0);
+		return 0;
+	}
 }
 
 void write16(uint32_t addr, uint16_t value)

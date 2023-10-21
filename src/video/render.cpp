@@ -46,6 +46,14 @@ static void write_screen(int index, int x, uint8_t value)
 static void write_color(std::unique_ptr<uint16_t[]>& buffer, int x, int y, uint16_t value)
 {
 	x &= 0x1FF;
+
+	//Layer output is always 240 lines long, even in 224-line mode
+	//This just centers the picture for 224-line mode
+	if (!vdp.mode.extra_scanlines)
+	{
+		y += 8;
+	}
+
 	if (x < DISPLAY_WIDTH)
 	{
 		buffer[x + (y * DISPLAY_WIDTH)] = value;
@@ -668,20 +676,6 @@ static void display_capture(int y)
 
 void draw_scanline(int y)
 {
-	//Clear the output buffers
-	constexpr static int LINE_SIZE = DISPLAY_WIDTH * 2;
-	int offs = y * DISPLAY_WIDTH;
-	for (int i = 0; i < 2; i++)
-	{
-		memset(vdp.bg_output[i].get() + offs, 0, LINE_SIZE);
-		memset(vdp.obj_output[i].get() + offs, 0, LINE_SIZE);
-		memset(vdp.bitmap_output[i].get() + offs, 0, LINE_SIZE);
-		memset(vdp.bitmap_output[i + 2].get() + offs, 0, LINE_SIZE);
-		memset(vdp.screen_output[i].get() + offs, 0, LINE_SIZE);
-	}
-
-	memset(vdp.display_output.get() + offs, 0, LINE_SIZE);
-
 	//Set both screens to the backdrop color
 	memset(vdp.screens, 0, sizeof(vdp.screens));
 

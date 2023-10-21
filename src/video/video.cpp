@@ -131,7 +131,7 @@ static void inc_vcount(uint64_t param, int cycles_late)
 {
 	//Leave HSYNC
 	vdp.hcount &= ~0x100;
-	if (vdp.vcount < DISPLAY_HEIGHT)
+	if (vdp.vcount < vdp.visible_scanlines)
 	{
 		Renderer::draw_scanline(vdp.vcount);
 	}
@@ -139,7 +139,7 @@ static void inc_vcount(uint64_t param, int cycles_late)
 	vdp.vcount++;
 	
 	//Once we go past the visible region, enter VSYNC
-	if (vdp.vcount == DISPLAY_HEIGHT)
+	if (vdp.vcount == vdp.visible_scanlines)
 	{
 		vsync_start();
 	}
@@ -177,6 +177,8 @@ static void dump_serial_region(std::ofstream& dump, uint8_t* mem, uint32_t addr,
 void initialize()
 {
 	vdp = {};
+
+	vdp.visible_scanlines = 0xE0;
 
 	//Initialize output buffers
 	for (int i = 0; i < 2; i++)
@@ -220,6 +222,20 @@ void shutdown()
 void start_frame()
 {
 	vdp.frame_ended = false;
+
+	constexpr static int BUFFER_SIZE = DISPLAY_WIDTH * DISPLAY_HEIGHT;
+
+	//Clear the output buffers
+	for (int i = 0; i < 2; i++)
+	{
+		memset(vdp.bg_output[i].get(), 0, BUFFER_SIZE);
+		memset(vdp.obj_output[i].get(), 0, BUFFER_SIZE);
+		memset(vdp.bitmap_output[i].get(), 0, BUFFER_SIZE);
+		memset(vdp.bitmap_output[i + 2].get(), 0, BUFFER_SIZE);
+		memset(vdp.screen_output[i].get(), 0, BUFFER_SIZE);
+	}
+
+	memset(vdp.display_output.get(), 0, BUFFER_SIZE);
 }
 
 bool check_frame_end()
@@ -475,8 +491,15 @@ uint16_t ctrl_read16(uint32_t addr)
 	switch (addr)
 	{
 	case 0x000:
-		printf("[Video] read ctrl 000\n");
-		return 0;
+	{
+		uint16_t result = vdp.mode.use_pal;
+		result |= vdp.mode.extra_scanlines << 1;
+		result |= vdp.mode.unk << 2;
+		result |= vdp.mode.mouse_scan << 3;
+		result |= vdp.mode.pad_scan << 4;
+		result |= vdp.mode.unk2 << 5;
+		return result;
+	}
 	case 0x002:
 		//FIXME: This only reflects HSYNC status, it doesn't actually return the horizontal counter
 		return vdp.hcount;
@@ -505,7 +528,16 @@ void ctrl_write16(uint32_t addr, uint16_t value)
 	switch (addr)
 	{
 	case 0x000:
-		printf("[Video] write ctrl 000: %04X\n", value);
+		printf("[Video] write MODE: %04X\n", value);
+		vdp.mode.use_pal = value & 0x1;
+		vdp.mode.extra_scanlines = (value >> 1) & 0x1;
+		vdp.mode.unk = (value >> 2) & 0x1;
+		vdp.mode.mouse_scan = (value >> 3) & 0x1;
+		vdp.mode.pad_scan = (value >> 4) & 0x1;
+		vdp.mode.unk2 = (value >> 5) & 0x1;
+		assert(!vdp.mode.use_pal);
+
+		vdp.visible_scanlines = (vdp.mode.extra_scanlines) ? 0xF0 : 0xE0;
 		break;
 	case 0x006:
 		if (value & 0x01)
