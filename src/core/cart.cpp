@@ -29,6 +29,19 @@ void initialize(Config::CartInfo& info)
 	state.sram = info.sram;
 	state.sram_file_path = info.sram_file_path;
 
+	//Ensure that the ROM and SRAM are aligned to a 4 KB boundary
+	if (state.rom.size() & 0xFFF)
+	{
+		size_t new_size = (state.rom.size() + 0xFFF) & 0xFFF;
+		state.rom.resize(new_size, 0xFF);
+	}
+
+	if (state.sram.size() & 0xFFF)
+	{
+		size_t new_size = (state.sram.size() + 0xFFF) & 0xFFF;
+		state.sram.resize(new_size, 0xFF);
+	}
+
 	Memory::map_sh2_pagetable(state.rom.data(), ROM_START, state.rom.size());
 	Memory::map_sh2_pagetable(state.sram.data(), SRAM_START, state.sram.size());
 }
