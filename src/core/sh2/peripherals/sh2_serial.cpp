@@ -59,6 +59,8 @@ struct Port
 	uint8_t tx_buffer;
 	uint8_t tx_prepared_data;
 
+	void (*tx_callback)(uint8_t);
+
 	void calc_cycles_per_bit()
 	{
 		assert(!mode.sync_mode);
@@ -113,11 +115,8 @@ static void tx_event(uint64_t param, int cycles_late)
 	{
 		printf("[Serial] port%d tx %02X\n", port->id, port->tx_prepared_data);
 
-		// Send port 1 to sound chip
-		if (port->id == 1)
-		{
-			// TODO: enforce midi baud rate?
-			Sound::midi_byte_in(port->tx_prepared_data);
+		if (port->tx_callback != NULL) {
+			port->tx_callback(port->tx_prepared_data);
 		}
 
 		if (!port->status.tx_empty)
@@ -231,6 +230,12 @@ void write8(uint32_t addr, uint8_t value)
 	default:
 		assert(0);
 	}
+}
+
+void set_tx_callback(int port, void (*callback)(uint8_t))
+{
+	assert(port >= 0 && port < PORT_COUNT);
+	state.ports[port].tx_callback = callback;
 }
 
 }
