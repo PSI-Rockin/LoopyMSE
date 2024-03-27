@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdio>
+#include <sound/sound.h>
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/peripherals/sh2_serial.h"
 #include "core/timing.h"
@@ -111,6 +112,13 @@ static void tx_event(uint64_t param, int cycles_late)
 	if (!port->tx_bits_left)
 	{
 		printf("[Serial] port%d tx %02X\n", port->id, port->tx_prepared_data);
+
+		// Send port 1 to sound chip
+		if (port->id == 1)
+		{
+			// TODO: enforce midi baud rate?
+			Sound::midi_byte_in(port->tx_prepared_data);
+		}
 
 		if (!port->status.tx_empty)
 		{

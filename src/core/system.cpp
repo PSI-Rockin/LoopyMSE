@@ -1,4 +1,5 @@
 #include <input/input.h>
+#include <sound/sound.h>
 #include <video/video.h>
 #include "core/sh2/sh2.h"
 #include "core/cart.h"
@@ -28,11 +29,13 @@ void initialize(Config::SystemInfo& config)
 	//Initialize subprojects after everything else
 	Input::initialize();
 	Video::initialize();
+	Sound::initialize(config.sound_rom, config.audio.sample_rate, config.audio.buffer_size);
 }
 
 void shutdown()
 {
 	//Shutdown all components in the reverse order they were initialized
+	Sound::shutdown();
 	Video::shutdown();
 	Input::shutdown();
 

@@ -94,6 +94,30 @@ uint16_t read16(uint32_t addr)
 	}
 }
 
+uint8_t read8(uint32_t addr)
+{
+	addr &= 0xF;
+
+	switch (addr)
+	{
+	case 0x08:
+	{
+		uint8_t result = state.prios[(int)IRQ::DMAC2];
+		result |= state.prios[(int)IRQ::DMAC0] << 4;
+		return result;
+	}
+	case 0x09:
+	{
+		uint8_t result = state.prios[(int)IRQ::ITU1];
+		result |= state.prios[(int)IRQ::ITU0] << 4;
+		return result;
+	}
+	default:
+		assert(0);
+		return 0;
+	}
+}
+
 void write16(uint32_t addr, uint16_t value)
 {
 	addr &= 0xF;
@@ -105,6 +129,25 @@ void write16(uint32_t addr, uint16_t value)
 		state.prios[(int)IRQ::ITU0] = (value >> 4) & 0x0F;
 		state.prios[(int)IRQ::DMAC2] = state.prios[(int)IRQ::DMAC3] = (value >> 8) & 0x0F;
 		state.prios[(int)IRQ::DMAC0] = state.prios[(int)IRQ::DMAC1] = value >> 12;
+		break;
+	default:
+		assert(0);
+	}
+}
+
+void write8(uint32_t addr, uint8_t value)
+{
+	addr &= 0xF;
+
+	switch (addr)
+	{
+	case 0x08:
+		state.prios[(int)IRQ::DMAC2] = state.prios[(int)IRQ::DMAC3] = value & 0x0F;
+		state.prios[(int)IRQ::DMAC0] = state.prios[(int)IRQ::DMAC1] = value >> 4;
+		break;
+	case 0x09:
+		state.prios[(int)IRQ::ITU1] = value & 0x0F;
+		state.prios[(int)IRQ::ITU0] = value >> 4;
 		break;
 	default:
 		assert(0);

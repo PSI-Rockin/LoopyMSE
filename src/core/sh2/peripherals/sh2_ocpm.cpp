@@ -38,6 +38,11 @@ uint8_t io_read8(uint32_t addr)
 		return Timer::read8(addr);
 	}
 
+	if (addr >= INTC_START && addr < INTC_END)
+	{
+		return INTC::read8(addr);
+	}
+
 	switch (addr)
 	{
 	default:
@@ -97,6 +102,12 @@ void io_write8(uint32_t addr, uint8_t value)
 	if (addr >= TIMER_START && addr < TIMER_END)
 	{
 		Timer::write8(addr, value);
+		return;
+	}
+
+	if (addr >= INTC_START && addr < INTC_END)
+	{
+		INTC::write8(addr, value);
 		return;
 	}
 

@@ -1,0 +1,60 @@
+/*
+Casio Loopy sound implementation by kasami, 2023-2024.
+Features a reverse-engineered uPD937 synth engine, MIDI retiming, EQ filtering and resampling.
+
+This implementation is INCOMPLETE, but mostly sufficient for Loopy emulation running original game
+software. It is missing playback of the internal demo tune (used by some games) and rhythm presets
+(not used) as the formats are currently unknown, and the synth core also lacks some small details.
+
+The code is messy and will probably stay that way until a more complete implementation (standalone
+uPD937 library?) replaces it in the future. It was ported from a Java prototype, and may have some
+inefficiencies and things that aren't structured well for C++.
+
+Game support notes:
+- PC Collection title screen goes a bit fast and some sounds get stuck (timing issue?)
+- Wanwan has no PCM sample support, and seems to crackle on dialog sfx (same timing issue?)
+*/
+
+#pragma once
+#include <cstdint>
+#include <vector>
+
+namespace Sound
+{
+
+// Set the target output format. 44100/48000Hz provides good quality.
+// A buffer of 10-20ms is reasonable for low latency.
+// SDL will convert unsupported formats internally.
+constexpr static int TARGET_SAMPLE_RATE = 48000;
+constexpr static int TARGET_BUFFER_SIZE = 512;
+
+// Time reference to smooth out audio timing at larger buffer sizes. Assumes consistent CPU timing.
+constexpr static int TIMEREF_FREQUENCY = 100;
+constexpr static bool TIMEREF_ENABLE = TIMEREF_FREQUENCY > (TARGET_SAMPLE_RATE / TARGET_BUFFER_SIZE);
+
+// Audio synthesis parameters. Tuning affects internal sample rate.
+// Filter affects both high and low frequencies to approximate the mixing circuit response.
+constexpr static float TUNING = 442.f;
+constexpr static float MIX_LEVEL = 0.8f;
+constexpr static bool FILTER_ENABLE = true;
+
+
+void initialize(std::vector<uint8_t>& soundRom, int sampleRate, int bufferSize);
+void shutdown();
+
+constexpr static int CTRL_START = 0x04080000;
+constexpr static int CTRL_END = 0x040A0000;
+
+uint8_t ctrl_read8(uint32_t addr);
+uint16_t ctrl_read16(uint32_t addr);
+uint32_t ctrl_read32(uint32_t addr);
+
+void ctrl_write8(uint32_t addr, uint8_t value);
+void ctrl_write16(uint32_t addr, uint16_t value);
+void ctrl_write32(uint32_t addr, uint32_t value);
+
+void midi_byte_in(uint8_t value);
+
+void buffer_callback(int16_t* buffer, uint32_t count, bool mute);
+
+}
