@@ -39,7 +39,7 @@ void initialize()
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 
     //Set up SDL screen
-    SDL_CreateWindowAndRenderer(DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, &screen.window, &screen.renderer);
+    SDL_CreateWindowAndRenderer(2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT, 0, &screen.window, &screen.renderer);
     SDL_SetWindowTitle(screen.window, "Rupi");
     SDL_SetWindowSize(screen.window, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
     SDL_SetWindowResizable(screen.window, SDL_FALSE);

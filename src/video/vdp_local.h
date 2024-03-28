@@ -51,7 +51,15 @@ struct VDP
 
 	uint16_t hcount;
 	uint16_t vcount;
-	
+
+	struct SyncIrqCtrl
+	{
+		int irq1_enable;
+		int irq1_source;
+	};
+
+	SyncIrqCtrl sync_irq_ctrl;
+
 	int capture_enable;
 
 	//Bitmap registers - 0x0C059xxx
