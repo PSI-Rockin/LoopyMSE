@@ -30,7 +30,7 @@ void initialize(Config::SystemInfo& config)
 	//Initialize subprojects after everything else
 	Input::initialize();
 	Video::initialize();
-	Sound::initialize(config.sound_rom, config.audio.sample_rate, config.audio.buffer_size);
+	Sound::initialize(config.sound_rom);
 
 	//Hook up connections between modules
 	SH2::OCPM::Serial::set_tx_callback(1, &Sound::midi_byte_in);

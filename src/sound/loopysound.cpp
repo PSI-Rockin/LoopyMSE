@@ -547,16 +547,16 @@ int UPD937_Core::midiProgToBank(int prog, int bankSelect) {
 	return prog-10 + bankSelect*100 + HC_NUM_BANKS*10;
 }
 
-LoopySound::LoopySound(std::vector<uint8_t>& romIn, float outRate, float tuning, float mixLevel, float buffersPerSecond, bool filterEnable) {
+LoopySound::LoopySound(std::vector<uint8_t>& romIn, float outRate, int bufferSize) {
 	this->outRate = outRate;
-	this->synthRate = tuning*192;
-	this->mixLevel = mixLevel;
-	this->buffersPerSecond = buffersPerSecond;
-	printf("[Sound] Init uPD937 core: synth rate %.01f, out rate %.01f\n", synthRate, outRate);
+	this->synthRate = TUNING * 192;
+	this->mixLevel = MIX_LEVEL;
+	this->bufferSize = bufferSize;
+	printf("[Sound] Init uPD937 core: synth rate %.01f, out rate %.01f, buffer size %d\n", synthRate, outRate, bufferSize);
 	synth = new UPD937_Core(romIn, synthRate);
-	if(filterEnable) {
+	if(FILTER_ENABLE) {
 		printf("[Sound] Init filters\n");
-		filterTone = new BiquadStereoFilter(synthRate, 8250, 1.67, false);
+		filterTone = new BiquadStereoFilter(synthRate, FILTER_CUTOFF, FILTER_RESONANCE, false);
 		filterBlockDC = new BiquadStereoFilter(outRate, 20, 0.7, true);
 	} else {
 		filterTone = NULL;
@@ -566,28 +566,28 @@ LoopySound::LoopySound(std::vector<uint8_t>& romIn, float outRate, float tuning,
 
 void LoopySound::genSample(float out[]) {
 	// Process midi events every 64 samples
-	if((sampleCount&63) == 0) {
+	if((outSampleCount & 63) == 0) {
 		handleMidiEvent();
 	}
-	interpolationStep += synthRate/outRate;
+	interpolationStep += synthRate / outRate;
 	while(interpolationStep >= 1.f) {
 		lastSample[0] = currentSample[0];
 		lastSample[1] = currentSample[1];
 		synth->genSample(rawSamples);
 		// Get synth sample and filter it at synth rate
-		currentSample[0] = rawSamples[0]/32768.f;
-		currentSample[1] = rawSamples[1]/32768.f;
+		currentSample[0] = rawSamples[0] / 32768.f;
+		currentSample[1] = rawSamples[1] / 32768.f;
 		if(filterTone) filterTone->process(currentSample);
 		interpolationStep--;
 	}
 	// Resample and mix at out rate
-	mixSample[0] = (lastSample[0] + (currentSample[0]-lastSample[0])*interpolationStep) * 6.8f * mixLevel;
-	mixSample[1] = (lastSample[1] + (currentSample[1]-lastSample[1])*interpolationStep) * 6.8f * mixLevel;
+	mixSample[0] = (lastSample[0] + (currentSample[0]-lastSample[0]) * interpolationStep) * 6.8f * mixLevel;
+	mixSample[1] = (lastSample[1] + (currentSample[1]-lastSample[1]) * interpolationStep) * 6.8f * mixLevel;
 	if(filterBlockDC) filterBlockDC->process(mixSample);
 	// Write output
 	out[0] = std::min(std::max(-1.f, mixSample[0]), 1.f);
 	out[1] = std::min(std::max(-1.f, mixSample[1]), 1.f);
-	sampleCount++;
+	outSampleCount++;
 }
 
 void LoopySound::setChannelMuted(int channel, bool mute) {
@@ -597,18 +597,20 @@ void LoopySound::setChannelMuted(int channel, bool mute) {
 void LoopySound::timeReference(float delta) {
 	hasTimeReference = true;
 	if(delta > 0) {
-		int sDelta = (int) floor(delta * synthRate);
-		timeReferenceT += sDelta;
+		int deltaSamples = (int)floor(delta * outRate);
+		timeReferenceSamples += deltaSamples;
 	}
 
 	// Hard correction, keep within sane distance of local time
-	int spb = (int)ceil(synthRate / buffersPerSecond);
-	if(timeReferenceT < sampleCount) timeReferenceT = sampleCount;
-	if(timeReferenceT > sampleCount+2*spb) timeReferenceT = sampleCount+2*spb;
+	if(timeReferenceSamples < outSampleCount) {
+		timeReferenceSamples = outSampleCount;
+	} else if(timeReferenceSamples > outSampleCount + (2 * bufferSize)) {
+		timeReferenceSamples = outSampleCount + (2 * bufferSize);
+	}
 
 	// Soft correction, slowly drift towards local time (middle of hard range)
 	// This introduces some relative error but biases it to hit hard limits less often
-	timeReferenceT += (sampleCount+spb-timeReferenceT+32)>>6;
+	timeReferenceSamples += (outSampleCount + bufferSize - timeReferenceSamples + 32) >> 6;
 }
 
 void LoopySound::setControlRegister(int creg) {
@@ -660,11 +662,11 @@ void LoopySound::setControlRegister(int creg) {
 bool LoopySound::midiIn(char b) {
 	// temporarily ignore midi here when in demo or keyboard mode
 	if(inDemo || (channelConfigState == 0)) return true;
-	return enqueueMidiByte(b, timeReferenceT);
+	return enqueueMidiByte(b, timeReferenceSamples);
 }
 
 bool LoopySound::enqueueMidiByte(char midiByte, int timestamp) {
-	if((queueWrite+1) % MIDI_QUEUE_CAPACITY == queueRead) {
+	if((queueWrite + 1) % MIDI_QUEUE_CAPACITY == queueRead) {
 		if(!midiOverflowed) printf("[Sound] MIDI queue overflow, increase queue capacity or send smaller groups more often.\n");
 		midiOverflowed = true;
 		return false;
@@ -672,22 +674,17 @@ bool LoopySound::enqueueMidiByte(char midiByte, int timestamp) {
 	midiOverflowed = false;
 	midiQueueBytes[queueWrite] = midiByte;
 	midiQueueTimestamps[queueWrite] = timestamp;
-	queueWrite = (queueWrite+1) % MIDI_QUEUE_CAPACITY;
-	int newQueuedBytes = (MIDI_QUEUE_CAPACITY + queueWrite - queueRead) % MIDI_QUEUE_CAPACITY;
-	if(newQueuedBytes > maxQueuedBytes) {
-		maxQueuedBytes = newQueuedBytes;
-		//printf("[Sound] Queued "+maxQueuedBytes+" bytes max\n");
-	}
+	queueWrite = (queueWrite + 1) % MIDI_QUEUE_CAPACITY;
 	return true;
 }
 
 void LoopySound::handleMidiEvent() {
 	while(queueWrite != queueRead) {
 		int etime = midiQueueTimestamps[queueRead];
-		int timeDiff = (etime - sampleCount); // wraparound taken care of here
+		int timeDiff = (etime - outSampleCount); // wraparound taken care of here
 		if(hasTimeReference && timeDiff > 0) break;
 		char ebyte = midiQueueBytes[queueRead];
-		queueRead = (queueRead+1) % MIDI_QUEUE_CAPACITY;
+		queueRead = (queueRead + 1) % MIDI_QUEUE_CAPACITY;
 		synth->processMidiNow(ebyte);
 	}
 }

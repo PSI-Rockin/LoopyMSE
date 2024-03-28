@@ -25,21 +25,10 @@ struct Screen
 };
 
 static Screen screen;
-static SDL_AudioDeviceID audio_device;
-static int audio_sample_rate;
-static int audio_buffer_size;
-
-void audio_callback(void* userdata, uint8_t* stream, int len)
-{
-    // SDL runs everything slower when minimized, so mute audio then
-    bool mute = SDL_GetWindowFlags(screen.window) & SDL_WINDOW_MINIMIZED;
-    int16_t* stream16 = (int16_t*) stream;
-    Sound::buffer_callback(stream16, len/2, mute);
-}
 
 void initialize()
 {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
         printf("Failed to initialize SDL2: %s\n", SDL_GetError());
 
@@ -57,31 +46,9 @@ void initialize()
     SDL_RenderSetLogicalSize(screen.renderer, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
 
     screen.texture = SDL_CreateTexture(screen.renderer, SDL_PIXELFORMAT_ARGB1555, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-
-    // Compute reasonable audio buffer for low latency (10-20ms)
-    int want_sample_rate = Sound::TARGET_SAMPLE_RATE;
-    int want_buffer_size = Sound::TARGET_BUFFER_SIZE;
-    while(want_buffer_size < want_sample_rate/100) want_buffer_size *= 2;
-
-    // Set up SDL audio with callback
-    SDL_AudioSpec want, have;
-    SDL_zero(want);
-    want.freq = want_sample_rate;
-    want.format = AUDIO_S16SYS;
-    want.channels = 2;
-    want.samples = want_buffer_size;
-    want.callback = audio_callback;
-    want.userdata = NULL;
-    audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-    audio_sample_rate = have.freq;
-    audio_buffer_size = have.samples;
-    SDL_PauseAudioDevice(audio_device, 0);
 }
 
 void shutdown() {
-    // Close audio device
-    SDL_CloseAudioDevice(audio_device);
-
     //Destroy window, then kill SDL2
     SDL_DestroyTexture(screen.texture);
     SDL_DestroyRenderer(screen.renderer);
@@ -187,10 +154,6 @@ int main(int argc, char** argv)
     //If the file was larger, then the vector size is clamped
     config.cart.sram.resize(sram_size, 0xFF);
 
-    //Copy audio paramters to system config
-    config.audio.sample_rate = SDL::audio_sample_rate;
-    config.audio.buffer_size = SDL::audio_buffer_size;
-
     //Initialize the emulator and all of its subprojects
     System::initialize(config);
 
@@ -230,6 +193,20 @@ int main(int argc, char** argv)
             case SDL_KEYUP:
                 Input::set_key_state(e.key.keysym.sym, false);
                 break;
+            case SDL_WINDOWEVENT:
+                // Everything slows down when minimized so mute sound
+                switch (e.window.event)
+                {
+                case SDL_WINDOWEVENT_HIDDEN:
+                case SDL_WINDOWEVENT_MINIMIZED:
+                    Sound::set_mute(true);
+                    break;
+                case SDL_WINDOWEVENT_SHOWN:
+                case SDL_WINDOWEVENT_MAXIMIZED:
+                case SDL_WINDOWEVENT_RESTORED:
+                    Sound::set_mute(false);
+                    break;
+                }
             }
         }
     }

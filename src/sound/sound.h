@@ -22,24 +22,24 @@ Game support notes:
 namespace Sound
 {
 
-// Set the target output format. 44100/48000Hz provides good quality.
-// A buffer of 10-20ms is reasonable for low latency.
-// SDL will convert unsupported formats internally.
+// Target output format. 44100-48000Hz provides good quality.
+// SDL converts unsupported formats internally.
+// Smaller buffer gives lower latency, larger buffer allows smoother timing with time reference.
+// A good compromise buffer size is around 50ms.
 constexpr static int TARGET_SAMPLE_RATE = 48000;
-constexpr static int TARGET_BUFFER_SIZE = 512;
+constexpr static int TARGET_BUFFER_SIZE = 2048;
 
 // Time reference to smooth out audio timing at larger buffer sizes. Assumes consistent CPU timing.
 constexpr static int TIMEREF_FREQUENCY = 100;
 constexpr static bool TIMEREF_ENABLE = TIMEREF_FREQUENCY > (TARGET_SAMPLE_RATE / TARGET_BUFFER_SIZE);
 
-// Audio synthesis parameters. Tuning affects internal sample rate.
-// Filter affects both high and low frequencies to approximate the mixing circuit response.
-constexpr static float TUNING = 442.f;
-constexpr static float MIX_LEVEL = 0.8f;
-constexpr static bool FILTER_ENABLE = true;
+// Fade up/down time in milliseconds when sound is muted e.g. by minimizing the window.
+constexpr static int MUTE_FADE_MS = 20;
+
+// Audio synthesis parameters in loopysound.h.
 
 
-void initialize(std::vector<uint8_t>& soundRom, int sampleRate, int bufferSize);
+void initialize(std::vector<uint8_t>& soundRom);
 void shutdown();
 
 constexpr static int CTRL_START = 0x04080000;
@@ -48,13 +48,14 @@ constexpr static int CTRL_END = 0x040A0000;
 uint8_t ctrl_read8(uint32_t addr);
 uint16_t ctrl_read16(uint32_t addr);
 uint32_t ctrl_read32(uint32_t addr);
-
 void ctrl_write8(uint32_t addr, uint8_t value);
 void ctrl_write16(uint32_t addr, uint16_t value);
 void ctrl_write32(uint32_t addr, uint32_t value);
 
 void midi_byte_in(uint8_t value);
+void set_mute(bool mute_in);
 
-void buffer_callback(int16_t* buffer, uint32_t count, bool mute);
+static void timeref(uint64_t param, int cycles_late);
+static void buffer_callback(float* buffer, uint32_t count);
 
 }

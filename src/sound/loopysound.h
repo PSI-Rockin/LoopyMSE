@@ -21,6 +21,25 @@ Game support notes:
 
 namespace LoopySound {
 
+/* Audio synthesis parameters start */
+
+// Tuning of A4 note, affects internal sample rate.
+// Standard is 442Hz (internal sample rate 84864Hz).
+constexpr static float TUNING = 442.f;
+
+// Final mix level after amplification circuit.
+// Comfortable listening level is around 0.7 to 0.8, typical hardware level 0.62.
+constexpr static float MIX_LEVEL = 0.7f;
+
+// Filters affects both high and low frequencies to approximate the hardware's resonant LPF.
+// Cutoff and resonance derived from theoretical circuit analysis.
+constexpr static bool FILTER_ENABLE = true;
+constexpr static float FILTER_CUTOFF = 8247.f;
+constexpr static float FILTER_RESONANCE = 1.67f;
+
+/* Audio synthesis parameters end*/
+
+
 // Temporary hardcoded stuff
 constexpr static int HC_RATETABLE = 0x1000;
 constexpr static int HC_VOLTABLE = 0x1400;
@@ -34,9 +53,9 @@ constexpr static int HC_NUM_BANKS = 1;
 constexpr static int CLK2_MUL = 15625;
 constexpr static int CLK2_DIVP = 128;
 
-// Big enough midi retiming queue for 16ms audio buffer > 195 bytes
+// Big enough midi retiming queue for >250ms audio buffer.
 // Could be a lot lower for realtime midi. Must be a power of 2.
-constexpr static int MIDI_QUEUE_CAPACITY = 256;
+constexpr static int MIDI_QUEUE_CAPACITY = 2048;
 
 struct UPD937_VoiceState {
 	int channel, note;
@@ -166,6 +185,7 @@ private:
 	float mixLevel;
 	float outRate;
 	float synthRate;
+	int bufferSize;
 
 	// Interpolation state
 	int rawSamples[2] = {};
@@ -175,9 +195,8 @@ private:
 	float interpolationStep = 0;
 
 	// Timing correction
-	float buffersPerSecond;
-	int sampleCount = 0;
-	int timeReferenceT = 0;
+	int outSampleCount = 0;
+	int timeReferenceSamples = 0;
 	bool hasTimeReference = false;
 
 	// Interface state
@@ -189,11 +208,10 @@ private:
 	char midiQueueBytes[MIDI_QUEUE_CAPACITY];
 	int midiQueueTimestamps[MIDI_QUEUE_CAPACITY];
 	int queueWrite = 0, queueRead = 0;
-	int maxQueuedBytes = 0;
 	bool midiOverflowed = false;
 
 public:
-	LoopySound(std::vector<uint8_t>& romIn, float outRate, float tuning, float mixLevel, float buffersPerSecond, bool filterEnable);
+	LoopySound(std::vector<uint8_t>& romIn, float outRate, int bufferSize);
 	void genSample(float out[]);
 	void setChannelMuted(int channel, bool mute);
 	void timeReference(float delta);
