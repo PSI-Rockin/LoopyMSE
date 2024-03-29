@@ -20,7 +20,8 @@ Game support notes:
 #include <memory>
 #include <vector>
 
-namespace LoopySound {
+namespace LoopySound
+{
 
 /* Audio synthesis parameters start */
 
@@ -58,7 +59,8 @@ constexpr static int CLK2_DIVP = 128;
 // Could be a lot lower for realtime midi. Must be a power of 2.
 constexpr static int MIDI_QUEUE_CAPACITY = 2048;
 
-struct UPD937_VoiceState {
+struct UPD937_VoiceState
+{
 	int channel, note;
 	bool active, sustained;
 	int pitch;
@@ -70,7 +72,8 @@ struct UPD937_VoiceState {
 	bool sampNew;
 };
 
-struct UPD937_ChannelState {
+struct UPD937_ChannelState
+{
 	bool midiEnabled;
 	bool mute; // External
 	int firstVoice, voiceCount;
@@ -85,7 +88,8 @@ struct UPD937_ChannelState {
 	int allocateNext;
 };
 
-class UPD937_Core {
+class UPD937_Core
+{
 private:
 	// Volume sliders arbitrarily scaled to 4096.
 	// Values for 0,2,3,4 approximated, 1 guessed.
@@ -150,7 +154,8 @@ private:
 	int midiProgToBank(int prog, int bankSelect);
 };
 
-class BiquadStereoFilter {
+class BiquadStereoFilter
+{
 private:
 	// Filter parameters
 	float fs, fc, q;
@@ -176,7 +181,8 @@ private:
 	void updateCoefficients();
 };
 
-class LoopySound {
+class LoopySound
+{
 private:
 	std::unique_ptr<UPD937_Core> synth;
 	std::unique_ptr<BiquadStereoFilter> filterTone;
