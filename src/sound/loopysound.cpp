@@ -15,11 +15,12 @@ Game support notes:
 - Wanwan has no PCM sample support, and seems to crackle on dialog sfx (same timing issue?)
 */
 
-#include <sound/loopysound.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <vector>
+
+#include <sound/loopysound.h>
 
 namespace LoopySound {
 
@@ -28,7 +29,7 @@ UPD937_Core::UPD937_Core(std::vector<uint8_t>& romIn, float synthesisRate) {
 	int romsize = 1;
 	while(romsize < romIn.size()) romsize <<= 1;
 	rom = new uint8_t[romsize]{0};
-	for(int i=0; i<romIn.size(); i++) rom[i] = romIn[i];
+	memcpy(rom, romIn.data(), romIn.size());
 	rommask = romsize-1;
 
 	// Set up global state
@@ -78,8 +79,7 @@ void UPD937_Core::genSample(int out[]) {
 			}
 			accum += s;
 		}
-		if(accum < -32768) accum = -32768;
-		if(accum > 32767) accum = 32767;
+		accum = std::clamp(accum, -32767, 32767);
 		out[lr] = accum;
 	}
 }
@@ -119,10 +119,8 @@ void UPD937_Core::setChannelConfiguration(bool multi, bool all) {
 }
 
 void UPD937_Core::setVolumeSlider(int group, int slider) {
-	if(slider < 0) slider = 0;
-	if(slider > 4) slider = 4;
-	if(group < 0) group = 0;
-	if(group > 1) group = 1;
+	group = std::clamp(group, 0, 1);
+	slider = std::clamp(slider, 0, 4);
 	volumeSlider[group] = slider;
 }
 
@@ -235,9 +233,9 @@ void UPD937_Core::updateSample() {
 		if(vo->volumeRateCounter >= vo->volumeRateDiv) {
 			vo->volumeRateCounter = 0;
 			if(vo->volumeDown) {
-				vo->volume = std::min(std::max(0, std::max(vo->volumeTarget, vo->volume-vo->volumeRateMul)), 65535);
+				vo->volume = std::clamp(std::max(vo->volumeTarget, vo->volume - vo->volumeRateMul), 0, 65535);
 			} else {
-				vo->volume = std::min(std::max(0, std::min(vo->volumeTarget, vo->volume+vo->volumeRateMul)), 65535);
+				vo->volume = std::clamp(std::min(vo->volumeTarget, vo->volume + vo->volumeRateMul), 0, 65535);
 			}
 		}
 		if(vo->volume > 0) {
@@ -585,8 +583,8 @@ void LoopySound::genSample(float out[]) {
 	mixSample[1] = (lastSample[1] + (currentSample[1]-lastSample[1]) * interpolationStep) * 6.8f * mixLevel;
 	if(filterBlockDC) filterBlockDC->process(mixSample);
 	// Write output
-	out[0] = std::min(std::max(-1.f, mixSample[0]), 1.f);
-	out[1] = std::min(std::max(-1.f, mixSample[1]), 1.f);
+	out[0] = std::clamp(mixSample[0], -1.f, 1.f);
+	out[1] = std::clamp(mixSample[1], -1.f, 1.f);
 	outSampleCount++;
 }
 

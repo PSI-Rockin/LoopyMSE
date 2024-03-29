@@ -15,6 +15,7 @@ Game support notes:
 - Wanwan has no PCM sample support, and seems to crackle on dialog sfx (same timing issue?)
 */
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -38,7 +39,9 @@ static int sample_rate;
 static int buffer_size;
 
 static bool mute = false;
-static float mute_level;
+static float volume_level; // Automatically managed by mute
+
+static void buffer_callback(float* buffer, uint32_t count);
 
 /* SDL-specific code start */
 
@@ -92,6 +95,8 @@ static void sdl_audio_shutdown() {
 }
 
 /* SDL-specific code end */
+
+static void timeref(uint64_t param, int cycles_late);
 
 void initialize(std::vector<uint8_t>& soundRom) {
 	if(!soundRom.empty()) {
@@ -167,15 +172,14 @@ static void timeref(uint64_t param, int cycles_late) {
 	soundEngine->timeReference(timeref_period);
 }
 
-static void update_mute_level() {
+static void update_volume_level() {
 	if(MUTE_FADE_MS > 0) {
 		float delta = 1000.f / (sample_rate * MUTE_FADE_MS);
 		if(mute) delta = -delta;
-		mute_level += delta;
-		if(mute_level < 0) mute_level = 0;
-		if(mute_level > 1) mute_level = 1;
+		volume_level += delta;
+		volume_level = std::clamp(volume_level, 0.f, 1.f);
 	} else {
-		mute_level = mute ? 0 : 1;
+		volume_level = mute ? 0 : 1;
 	}
 }
 
@@ -186,10 +190,10 @@ static void buffer_callback(float* sample_buffer, uint32_t sample_count) {
 		int p = 0;
 		float level;
 		for(uint32_t i = 0; i < sample_count/2; i++) {
-			update_mute_level();
+			update_volume_level();
 			soundEngine->genSample(tmp);
-			sample_buffer[p++] = tmp[0] * mute_level;
-			sample_buffer[p++] = tmp[1] * mute_level;
+			sample_buffer[p++] = tmp[0] * volume_level;
+			sample_buffer[p++] = tmp[1] * volume_level;
 		}
 	} else {
 		// If for some reason we can't generate samples, zero the buffer

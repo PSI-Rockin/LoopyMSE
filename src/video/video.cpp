@@ -106,7 +106,7 @@ static void start_hsync(uint64_t param, int cycles_late)
 	//For now hcmp is not emulated but we just assume it happens at the same time as HSYNC
 	if (vdp.cmp_irq_ctrl.irq0_enable && vdp.cmp_irq_ctrl.irq0_enable2)
 	{
-		if(!vdp.cmp_irq_ctrl.use_vcmp || (vdp.vcount == vdp.irq0_vcmp))
+		if(!vdp.cmp_irq_ctrl.use_vcmp || vdp.vcount == vdp.irq0_vcmp)
 		{
 			auto irq_id = SH2::OCPM::INTC::IRQ::IRQ0;
 			SH2::OCPM::INTC::assert_irq(irq_id, 0);
@@ -114,9 +114,9 @@ static void start_hsync(uint64_t param, int cycles_late)
 		}
 	}
 	//IRQ1 is triggered on visible lines when in HSYNC mode
-	if (vdp.sync_irq_ctrl.irq1_enable && (vdp.sync_irq_ctrl.irq1_source == 1))
+	if (vdp.sync_irq_ctrl.irq1_enable && vdp.sync_irq_ctrl.irq1_source == 1)
 	{
-		if(vdp.vcount < 0x100)
+		if(vdp.vcount < vdp.visible_scanlines)
 		{
 			auto irq_id = SH2::OCPM::INTC::IRQ::IRQ1;
 			SH2::OCPM::INTC::assert_irq(irq_id, 0);

@@ -55,7 +55,4 @@ void ctrl_write32(uint32_t addr, uint32_t value);
 void midi_byte_in(uint8_t value);
 void set_mute(bool mute_in);
 
-static void timeref(uint64_t param, int cycles_late);
-static void buffer_callback(float* buffer, uint32_t count);
-
 }
