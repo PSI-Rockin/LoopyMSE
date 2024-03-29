@@ -17,6 +17,7 @@ Game support notes:
 
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace LoopySound {
@@ -90,7 +91,7 @@ private:
 	// Values for 0,2,3,4 approximated, 1 guessed.
 	const int VOLUME_SLIDER_LEVELS[5] = {0, 2048, 2580, 3251, 4096};
 
-	uint8_t* rom;
+	std::unique_ptr<uint8_t[]> rom;
 	int rommask;
 
 	// Global state
@@ -177,9 +178,9 @@ private:
 
 class LoopySound {
 private:
-	UPD937_Core *synth;
-	BiquadStereoFilter* filterTone;
-	BiquadStereoFilter* filterBlockDC;
+	std::unique_ptr<UPD937_Core> synth;
+	std::unique_ptr<BiquadStereoFilter> filterTone;
+	std::unique_ptr<BiquadStereoFilter> filterBlockDC;
 
 	// Audio parameters
 	float mixLevel;

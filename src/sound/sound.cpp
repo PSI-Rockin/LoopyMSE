@@ -19,6 +19,7 @@ Game support notes:
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 #include <SDL.h>
@@ -33,7 +34,7 @@ namespace Sound
 static Timing::FuncHandle timeref_func;
 static Timing::EventHandle timeref_ev;
 
-static LoopySound::LoopySound* soundEngine;
+static std::unique_ptr<LoopySound::LoopySound> soundEngine;
 
 static int sample_rate;
 static int buffer_size;
@@ -104,7 +105,7 @@ void initialize(std::vector<uint8_t>& soundRom) {
 			return;
 		}
 
-		soundEngine = new LoopySound::LoopySound(soundRom, sample_rate, buffer_size);
+		soundEngine = std::make_unique<LoopySound::LoopySound>(soundRom, (float)sample_rate, buffer_size);
 
 		if(TIMEREF_ENABLE) {
 			printf("[Sound] Schedule timeref %d Hz\n", TIMEREF_FREQUENCY);
@@ -116,6 +117,7 @@ void initialize(std::vector<uint8_t>& soundRom) {
 
 void shutdown() {
 	sdl_audio_shutdown();
+	soundEngine = nullptr;
 }
 
 uint8_t ctrl_read8(uint32_t addr) {
@@ -179,7 +181,7 @@ static void update_volume_level() {
 		volume_level += delta;
 		volume_level = std::clamp(volume_level, 0.f, 1.f);
 	} else {
-		volume_level = mute ? 0 : 1;
+		volume_level = mute ? 0.f : 1.f;
 	}
 }
 
@@ -188,7 +190,6 @@ static void buffer_callback(float* sample_buffer, uint32_t sample_count) {
 		// Generate samples if we can, updating the mute level every sample
 		float tmp[2];
 		int p = 0;
-		float level;
 		for(uint32_t i = 0; i < sample_count/2; i++) {
 			update_volume_level();
 			soundEngine->genSample(tmp);

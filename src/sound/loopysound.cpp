@@ -18,6 +18,7 @@ Game support notes:
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <memory>
 #include <vector>
 
 #include <sound/loopysound.h>
@@ -28,8 +29,8 @@ UPD937_Core::UPD937_Core(std::vector<uint8_t>& romIn, float synthesisRate) {
 	// Pad ROM to a power of 2
 	int romsize = 1;
 	while(romsize < romIn.size()) romsize <<= 1;
-	rom = new uint8_t[romsize]{0};
-	memcpy(rom, romIn.data(), romIn.size());
+	rom = std::make_unique<uint8_t[]>(romsize);
+	memcpy(rom.get(), romIn.data(), romIn.size());
 	rommask = romsize-1;
 
 	// Set up global state
@@ -551,14 +552,14 @@ LoopySound::LoopySound(std::vector<uint8_t>& romIn, float outRate, int bufferSiz
 	this->mixLevel = MIX_LEVEL;
 	this->bufferSize = bufferSize;
 	printf("[Sound] Init uPD937 core: synth rate %.01f, out rate %.01f, buffer size %d\n", synthRate, outRate, bufferSize);
-	synth = new UPD937_Core(romIn, synthRate);
+	synth = std::make_unique<UPD937_Core>(romIn, synthRate);
 	if(FILTER_ENABLE) {
 		printf("[Sound] Init filters\n");
-		filterTone = new BiquadStereoFilter(synthRate, FILTER_CUTOFF, FILTER_RESONANCE, false);
-		filterBlockDC = new BiquadStereoFilter(outRate, 20, 0.7, true);
+		filterTone = std::make_unique<BiquadStereoFilter>(synthRate, FILTER_CUTOFF, FILTER_RESONANCE, false);
+		filterBlockDC = std::make_unique<BiquadStereoFilter>(outRate, 20.f, 0.7f, true);
 	} else {
-		filterTone = NULL;
-		filterBlockDC = NULL;
+		filterTone = nullptr;
+		filterBlockDC = nullptr;
 	}
 }
 
@@ -740,7 +741,7 @@ void BiquadStereoFilter::process(float sample[]) {
 
 void BiquadStereoFilter::updateCoefficients() {
 	// Second order shared
-	constexpr static float PI = 3.14159265358979323846;
+	constexpr static float PI = 3.14159265358979323846f;
 	float K = (float)tan(PI*fc/fs);
 	float W = K*K;
 	float alpha = 1 + (K / q) + W;

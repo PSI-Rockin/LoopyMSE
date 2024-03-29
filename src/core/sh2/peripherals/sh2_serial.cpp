@@ -1,5 +1,7 @@
 #include <cassert>
 #include <cstdio>
+#include <functional>
+
 #include <sound/sound.h>
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/peripherals/sh2_serial.h"
@@ -59,7 +61,7 @@ struct Port
 	uint8_t tx_buffer;
 	uint8_t tx_prepared_data;
 
-	void (*tx_callback)(uint8_t);
+	std::function<void(uint8_t)> tx_callback;
 
 	void calc_cycles_per_bit()
 	{
@@ -115,7 +117,7 @@ static void tx_event(uint64_t param, int cycles_late)
 	{
 		printf("[Serial] port%d tx %02X\n", port->id, port->tx_prepared_data);
 
-		if (port->tx_callback != NULL) {
+		if (port->tx_callback != nullptr) {
 			port->tx_callback(port->tx_prepared_data);
 		}
 
@@ -232,7 +234,7 @@ void write8(uint32_t addr, uint8_t value)
 	}
 }
 
-void set_tx_callback(int port, void (*callback)(uint8_t))
+void set_tx_callback(int port, std::function<void(uint8_t)> callback)
 {
 	assert(port >= 0 && port < PORT_COUNT);
 	state.ports[port].tx_callback = callback;
