@@ -729,6 +729,19 @@ static void neg(uint16_t instr)
 	sh2.gpr[dst] = -sh2.gpr[src];
 }
 
+static void negc(uint16_t instr)
+{
+	uint32_t src = (instr >> 4) & 0xF;
+	uint32_t dst = (instr >> 8) & 0xF;
+
+	bool old_carry = GET_T();
+	uint32_t tmp = 0 - sh2.gpr[src];
+	sh2.gpr[dst] = tmp - old_carry;
+
+	bool new_carry = 0 < tmp || tmp < sh2.gpr[dst];
+	SET_T(new_carry);
+}
+
 static void sub(uint16_t instr)
 {
 	uint32_t src = (instr >> 4) & 0xF;
@@ -1376,6 +1389,10 @@ void run(uint16_t instr)
 	else if ((instr & 0xF00F) == 0x200E)
 	{
 		muluw(instr);
+	}
+	else if ((instr & 0xF00F) == 0x600A)
+	{
+		negc(instr);
 	}
 	else if ((instr & 0xF00F) == 0x600B)
 	{
