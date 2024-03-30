@@ -8,6 +8,7 @@
 #include <core/config.h>
 #include <core/system.h>
 #include <input/input.h>
+#include <sound/sound.h>
 #include <video/video.h>
 
 namespace SDL
@@ -38,7 +39,7 @@ void initialize()
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 
     //Set up SDL screen
-    SDL_CreateWindowAndRenderer(DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, &screen.window, &screen.renderer);
+    SDL_CreateWindowAndRenderer(2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT, 0, &screen.window, &screen.renderer);
     SDL_SetWindowTitle(screen.window, "Rupi");
     SDL_SetWindowSize(screen.window, 2 * DISPLAY_WIDTH, 2 * DISPLAY_HEIGHT);
     SDL_SetWindowResizable(screen.window, SDL_FALSE);
@@ -81,7 +82,8 @@ int main(int argc, char** argv)
 {
     if (argc < 3)
     {
-        printf("Args: [game ROM] [BIOS]\n");
+        //Sound ROM currently optional
+        printf("Args: <game ROM> <BIOS> [sound BIOS]\n");
         return 1;
     }
 
@@ -111,6 +113,21 @@ int main(int argc, char** argv)
 
     config.bios_rom.assign(std::istreambuf_iterator<char>(bios_file), {});
     bios_file.close();
+
+    // If last argument is given, load the sound ROM
+    if (argc >= 4)
+    {
+        std::string sound_rom_name = argv[3];
+        std::ifstream sound_rom_file(sound_rom_name, std::ios::binary);
+        if (!sound_rom_file.is_open())
+        {
+            printf("Failed to open %s\n", sound_rom_name.c_str());
+            return 1;
+        }
+
+        config.sound_rom.assign(std::istreambuf_iterator<char>(sound_rom_file), {});
+        sound_rom_file.close();
+    }
 
     //Determine the size of SRAM from the cartridge header
     uint32_t sram_start, sram_end;
@@ -176,6 +193,20 @@ int main(int argc, char** argv)
             case SDL_KEYUP:
                 Input::set_key_state(e.key.keysym.sym, false);
                 break;
+            case SDL_WINDOWEVENT:
+                // Everything slows down when minimized so mute sound
+                switch (e.window.event)
+                {
+                case SDL_WINDOWEVENT_HIDDEN:
+                case SDL_WINDOWEVENT_MINIMIZED:
+                    Sound::set_mute(true);
+                    break;
+                case SDL_WINDOWEVENT_SHOWN:
+                case SDL_WINDOWEVENT_MAXIMIZED:
+                case SDL_WINDOWEVENT_RESTORED:
+                    Sound::set_mute(false);
+                    break;
+                }
             }
         }
     }

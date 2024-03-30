@@ -1,6 +1,8 @@
 #include <input/input.h>
+#include <sound/sound.h>
 #include <video/video.h>
 #include "core/sh2/sh2.h"
+#include "core/sh2/peripherals/sh2_serial.h"
 #include "core/cart.h"
 #include "core/loopy_io.h"
 #include "core/memory.h"
@@ -28,11 +30,16 @@ void initialize(Config::SystemInfo& config)
 	//Initialize subprojects after everything else
 	Input::initialize();
 	Video::initialize();
+	Sound::initialize(config.sound_rom);
+
+	//Hook up connections between modules
+	SH2::OCPM::Serial::set_tx_callback(1, &Sound::midi_byte_in);
 }
 
 void shutdown()
 {
 	//Shutdown all components in the reverse order they were initialized
+	Sound::shutdown();
 	Video::shutdown();
 	Input::shutdown();
 

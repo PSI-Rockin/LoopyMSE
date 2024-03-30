@@ -17,6 +17,7 @@ struct SystemInfo
 {
 	CartInfo cart;
 	std::vector<uint8_t> bios_rom;
+	std::vector<uint8_t> sound_rom;
 };
 
 }
