@@ -75,8 +75,7 @@ void UPD937_Core::gen_sample(int out[])
 		{
 			UPD937_VoiceState *vo = &voices[v+lr];
 			UPD937_ChannelState *ch = &channels[vo->channel];
-			if(vo->volume == 0) continue;
-			if(ch->mute) continue;
+			if(vo->volume == 0 || ch->mute) continue;
 			int s = vo->sample_last_val;
 			int sb = (read_rom_16(vo->sample_ptr*2)>>4) - 0x800;
 			int sd = ((sb - s) * vo->sample_fract) / 0x8000;
@@ -706,14 +705,8 @@ void LoopySound::time_reference(float delta)
 	}
 
 	// Hard correction, keep within sane distance of local time
-	if(time_reference_samples < out_sample_count)
-	{
-		time_reference_samples = out_sample_count;
-	}
-	else if(time_reference_samples > out_sample_count + (2 * buffer_size))
-	{
-		time_reference_samples = out_sample_count + (2 * buffer_size);
-	}
+	int clamp_range = 2 * buffer_size;
+	time_reference_samples = std::clamp(time_reference_samples, out_sample_count, out_sample_count + clamp_range);
 
 	// Soft correction, slowly drift towards local time (middle of hard range)
 	// This introduces some relative error but biases it to hit hard limits less often
