@@ -39,7 +39,7 @@ constexpr static int MUTE_FADE_MS = 20;
 // Audio synthesis parameters in loopysound.h.
 
 
-void initialize(std::vector<uint8_t>& soundRom);
+void initialize(std::vector<uint8_t>& sound_rom);
 void shutdown();
 
 constexpr static int CTRL_START = 0x04080000;

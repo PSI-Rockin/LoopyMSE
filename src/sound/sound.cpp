@@ -34,7 +34,7 @@ namespace Sound
 static Timing::FuncHandle timeref_func;
 static Timing::EventHandle timeref_ev;
 
-static std::unique_ptr<LoopySound::LoopySound> soundEngine;
+static std::unique_ptr<LoopySound::LoopySound> sound_engine;
 
 static int sample_rate;
 static int buffer_size;
@@ -104,16 +104,16 @@ static void sdl_audio_shutdown()
 
 static void timeref(uint64_t param, int cycles_late);
 
-void initialize(std::vector<uint8_t>& soundRom)
+void initialize(std::vector<uint8_t>& sound_rom)
 {
-	if(!soundRom.empty())
+	if(!sound_rom.empty())
 	{
 		if(!sdl_audio_initialize())
 		{
 			return;
 		}
 
-		soundEngine = std::make_unique<LoopySound::LoopySound>(soundRom, (float)sample_rate, buffer_size);
+		sound_engine = std::make_unique<LoopySound::LoopySound>(sound_rom, (float)sample_rate, buffer_size);
 
 		if(TIMEREF_ENABLE)
 		{
@@ -127,7 +127,7 @@ void initialize(std::vector<uint8_t>& soundRom)
 void shutdown()
 {
 	sdl_audio_shutdown();
-	soundEngine = nullptr;
+	sound_engine = nullptr;
 }
 
 uint8_t ctrl_read8(uint32_t addr)
@@ -158,9 +158,9 @@ void ctrl_write16(uint32_t addr, uint16_t value)
 	value &= 0xFFF;
 	//printf("[Sound] Control register %03X\n", value);
 	//fflush(stdout);
-	if(soundEngine)
+	if(sound_engine)
 	{
-		soundEngine->setControlRegister(value);
+		sound_engine->set_control_register(value);
 	}
 }
 
@@ -173,9 +173,9 @@ void midi_byte_in(uint8_t value)
 {
 	//printf("[Sound] MIDI byte %02X\n", value);
 	//fflush(stdout);
-	if(soundEngine)
+	if(sound_engine)
 	{
-		soundEngine->midiIn((char)value);
+		sound_engine->midi_in((char)value);
 	}
 }
 
@@ -192,7 +192,7 @@ static void timeref(uint64_t param, int cycles_late)
 	timeref_ev = Timing::add_event(timeref_func, timeref_cycles, 0, Timing::CPU_TIMER);
 
 	constexpr static float timeref_period = 1.f / TIMEREF_FREQUENCY;
-	soundEngine->timeReference(timeref_period);
+	sound_engine->time_reference(timeref_period);
 }
 
 static void update_volume_level()
@@ -212,7 +212,7 @@ static void update_volume_level()
 
 static void buffer_callback(float* sample_buffer, uint32_t sample_count)
 {
-	if(soundEngine)
+	if(sound_engine)
 	{
 		// Generate samples if we can, updating the mute level every sample
 		float tmp[2];
@@ -220,7 +220,7 @@ static void buffer_callback(float* sample_buffer, uint32_t sample_count)
 		for(uint32_t i = 0; i < sample_count/2; i++)
 		{
 			update_volume_level();
-			soundEngine->genSample(tmp);
+			sound_engine->gen_sample(tmp);
 			sample_buffer[p++] = tmp[0] * volume_level;
 			sample_buffer[p++] = tmp[1] * volume_level;
 		}

@@ -64,28 +64,28 @@ struct UPD937_VoiceState
 	int channel, note;
 	bool active, sustained;
 	int pitch;
-	int volume, volumeTarget, volumeRateMul, volumeRateDiv, volumeRateCounter;
-	bool volumeDown;
-	int volEnv, volEnvStep, volEnvDelay;
-	int pitchEnv, pitchEnvStep, pitchEnvDelay, pitchEnvValue, pitchEnvRate, pitchEnvTarget;
-	int sampStart, sampEnd, sampLoop, sampPtr, sampFract, sampLastVal;
-	bool sampNew;
+	int volume, volume_target, volume_rate_mul, volume_rate_div, volume_rate_counter;
+	bool volume_down;
+	int volume_env, volume_env_step, volume_env_delay;
+	int pitch_env, pitch_env_step, pitch_env_delay, pitch_env_value, pitch_env_rate, pitch_env_target;
+	int sample_start, sample_end, sample_loop, sample_ptr, sample_fract, sample_last_val;
+	bool sample_new;
 };
 
 struct UPD937_ChannelState
 {
-	bool midiEnabled;
+	bool midi_enabled;
 	bool mute; // External
-	int firstVoice, voiceCount;
+	int first_voice, voice_count;
 	bool sustain;
 	// Current instrument parameters
 	int instrument;
-	int partialsOffset;
-	int keymapNo;
+	int partials_offset;
+	int keymap_no;
 	bool layered;
-	int bendOffset, bendValue;
+	int bend_offset, bend_value;
 	// Voice allocator
-	int allocateNext;
+	int allocate_next;
 };
 
 class UPD937_Core
@@ -96,7 +96,7 @@ private:
 	const int VOLUME_SLIDER_LEVELS[5] = {0, 2048, 2580, 3251, 4096};
 
 	std::unique_ptr<uint8_t[]> rom;
-	int rommask;
+	int rom_mask;
 
 	// Global state
 	uint32_t ptr_partials;
@@ -113,45 +113,45 @@ private:
 	// Sound synthesis state
 	UPD937_VoiceState voices[32];
 	UPD937_ChannelState channels[32];
-	int volumeSlider[2] = {};
+	int volume_slider[2] = {};
 
 	// Timer state
-	int clk2Counter = 0;
-	int delayUpdatePhase = 0;
-	uint32_t sampleCount = 0;
+	int clk2_counter = 0;
+	int delay_update_phase = 0;
+	uint32_t sample_count = 0;
 
 	// Audio output state
-	float synthesisRate;
+	float synthesis_rate;
 
 	// Midi parsing
-	int midiStatus = 0;
-	int midiRunningStatus = 0;
-	char midiParamBytes[8] = {};
-	int midiParamCount = 0;
-	bool midiInSysex = false;
+	int midi_status = 0;
+	int midi_running_status = 0;
+	char midi_param_bytes[8] = {};
+	int midi_param_count = 0;
+	bool midi_in_sysex = false;
 
 public:
-	UPD937_Core(std::vector<uint8_t>& romIn, float synthesisRate);
-	void genSample(int out[]);
-	void setChannelConfiguration(bool multi, bool all);
-	void setVolumeSlider(int group, int slider);
-	void setChannelMuted(int channel, bool mute);
-	void resetChannels(bool clearProgram);
-	void processMidiNow(char midiByte);
+	UPD937_Core(std::vector<uint8_t>& rom_in, float synthesis_rate);
+	void gen_sample(int out[]);
+	void set_channel_configuration(bool multi, bool all);
+	void set_volume_slider(int group, int slider);
+	void set_channel_muted(int channel, bool mute);
+	void reset_channels(bool clear_program);
+	void process_midi_now(char midi_byte);
 private:
-	int readRom8(int offset);
-	int readRom16(int offset);
-	int readRom24(int offset);
-	void updateSample();
-	void updateVolumeEnvelopes();
-	void updatePitchEnvelopes();
-	int getFreeVoice(int c);
-	void noteOn(int channel, int note);
-	void noteOff(int channel, int note);
-	void progCh(int channel, int prog);
-	void pitchBend(int channel, int bendByte);
-	void controlChgSustain(int channel, bool sustain);
-	int midiProgToBank(int prog, int bankSelect);
+	int read_rom_8(int offset);
+	int read_rom_16(int offset);
+	int read_rom_24(int offset);
+	void update_sample();
+	void update_volume_envelopes();
+	void update_pitch_envelopes();
+	int get_free_voice(int c);
+	void note_on(int channel, int note);
+	void note_off(int channel, int note);
+	void prog_chg(int channel, int prog);
+	void pitch_bend(int channel, int bend_byte);
+	void control_chg_sustain(int channel, bool sustain);
+	int midi_prog_to_bank(int prog, int bank_select);
 };
 
 class BiquadStereoFilter
@@ -170,63 +170,63 @@ private:
 
 public:
 	BiquadStereoFilter(float fs, float fc, float q, bool hp);
-	void setFs(float fs);
-	void setFc(float fc);
-	void setQ(float q);
-	void setHp(bool hp);
-	void setParameters(float fs, float fc, float q, bool hp);
+	void set_fs(float fs);
+	void set_fc(float fc);
+	void set_q(float q);
+	void set_hp(bool hp);
+	void set_parameters(float fs, float fc, float q, bool hp);
 	void reset();
 	void process(float sample[]);
 private:
-	void updateCoefficients();
+	void update_coefficients();
 };
 
 class LoopySound
 {
 private:
 	std::unique_ptr<UPD937_Core> synth;
-	std::unique_ptr<BiquadStereoFilter> filterTone;
-	std::unique_ptr<BiquadStereoFilter> filterBlockDC;
+	std::unique_ptr<BiquadStereoFilter> filter_tone;
+	std::unique_ptr<BiquadStereoFilter> filter_block_dc;
 
 	// Audio parameters
-	float mixLevel;
-	float outRate;
-	float synthRate;
-	int bufferSize;
+	float mix_level;
+	float out_rate;
+	float synth_rate;
+	int buffer_size;
 
 	// Interpolation state
-	int rawSamples[2] = {};
-	float currentSample[2] = {};
-	float lastSample[2] = {};
-	float mixSample[2] = {};
-	float interpolationStep = 0;
+	int raw_samples[2] = {};
+	float current_sample[2] = {};
+	float last_sample[2] = {};
+	float mix_sample[2] = {};
+	float interpolation_step = 0;
 
 	// Timing correction
-	int outSampleCount = 0;
-	int timeReferenceSamples = 0;
-	bool hasTimeReference = false;
+	int out_sample_count = 0;
+	int time_reference_samples = 0;
+	bool has_time_reference = false;
 
 	// Interface state
-	int buttonsLast = 0;
-	int channelConfigState = 0;
-	bool inDemo = false;
+	int buttons_last = 0;
+	int channel_config_state = 0;
+	bool in_demo = false;
 
 	// MIDI retiming queue
-	char midiQueueBytes[MIDI_QUEUE_CAPACITY];
-	int midiQueueTimestamps[MIDI_QUEUE_CAPACITY];
-	int queueWrite = 0, queueRead = 0;
-	bool midiOverflowed = false;
+	char midi_queue_bytes[MIDI_QUEUE_CAPACITY];
+	int midi_queue_timestamps[MIDI_QUEUE_CAPACITY];
+	int queue_write = 0, queue_read = 0;
+	bool midi_overflowed = false;
 
 public:
-	LoopySound(std::vector<uint8_t>& romIn, float outRate, int bufferSize);
-	void genSample(float out[]);
-	void setChannelMuted(int channel, bool mute);
-	void timeReference(float delta);
-	void setControlRegister(int creg);
-	bool midiIn(char b);
+	LoopySound(std::vector<uint8_t>& rom_in, float out_rate, int buffer_size);
+	void gen_sample(float out[]);
+	void set_channel_muted(int channel, bool mute);
+	void time_reference(float delta);
+	void set_control_register(int creg);
+	bool midi_in(char b);
 private:
-	bool enqueueMidiByte(char midiByte, int timestamp);
-	void handleMidiEvent();
+	bool enqueue_midi_byte(char midi_byte, int timestamp);
+	void handle_midi_event();
 };
 
 }

@@ -26,65 +26,65 @@ Game support notes:
 namespace LoopySound
 {
 
-UPD937_Core::UPD937_Core(std::vector<uint8_t>& romIn, float synthesisRate)
+UPD937_Core::UPD937_Core(std::vector<uint8_t>& rom_in, float synthesis_rate)
 {
 	// Pad ROM to a power of 2
-	int romsize = 1;
-	while(romsize < romIn.size()) romsize <<= 1;
-	rom = std::make_unique<uint8_t[]>(romsize);
-	memcpy(rom.get(), romIn.data(), romIn.size());
-	rommask = romsize-1;
+	int rom_size = 1;
+	while(rom_size < rom_in.size()) rom_size <<= 1;
+	rom = std::make_unique<uint8_t[]>(rom_size);
+	memcpy(rom.get(), rom_in.data(), rom_in.size());
+	rom_mask = rom_size-1;
 
 	// Set up global state
-	ptr_partials = readRom16(0) * 32;
-	ptr_pitchenv = readRom16(2) * 32;
-	ptr_volenv   = readRom16(4) * 32;
-	ptr_sampdesc = readRom16(6) * 32;
-	ptr_demosong = readRom16(8) * 32;
+	ptr_partials = read_rom_16(0) * 32;
+	ptr_pitchenv = read_rom_16(2) * 32;
+	ptr_volenv   = read_rom_16(4) * 32;
+	ptr_sampdesc = read_rom_16(6) * 32;
+	ptr_demosong = read_rom_16(8) * 32;
 
 	// Setup voice state
-	for(int i = 0; i < 32; i++)
+	for(int v = 0; v < 32; v++)
 	{
-		voices[i] = {};
+		voices[v] = {};
 	}
 
 	// Setup channel state
-	for(int i = 0; i < 4; i++)
+	for(int c = 0; c < 4; c++)
 	{
-		channels[i] = {};
-		progCh(i, 0);
+		channels[c] = {};
+		prog_chg(c, 0);
 	}
-	setChannelConfiguration(false, false);
+	set_channel_configuration(false, false);
 
-	this->synthesisRate = synthesisRate;
+	this->synthesis_rate = synthesis_rate;
 
-	midiRunningStatus = 0;
-	midiParamCount = 0;
-	midiInSysex = false;
+	midi_running_status = 0;
+	midi_param_count = 0;
+	midi_in_sysex = false;
 
-	volumeSlider[0] = volumeSlider[1] = 4;
+	volume_slider[0] = volume_slider[1] = 4;
 }
 
-void UPD937_Core::genSample(int out[])
+void UPD937_Core::gen_sample(int out[])
 {
-	updateSample();
+	update_sample();
 	for(int lr = 0; lr <= 1; lr++)
 	{
 		int accum = 0;
-		for(int i = 0; i < 16; i ++)
+		for(int v = 0; v < 32; v += 2)
 		{
-			UPD937_VoiceState *vo = &voices[i+i+lr];
+			UPD937_VoiceState *vo = &voices[v+lr];
 			UPD937_ChannelState *ch = &channels[vo->channel];
 			if(vo->volume == 0) continue;
 			if(ch->mute) continue;
-			int s = vo->sampLastVal;
-			int sb = (readRom16(vo->sampPtr*2)>>4) - 0x800;
-			int sd = ((sb - s) * vo->sampFract) / 0x8000;
+			int s = vo->sample_last_val;
+			int sb = (read_rom_16(vo->sample_ptr*2)>>4) - 0x800;
+			int sd = ((sb - s) * vo->sample_fract) / 0x8000;
 			s += sd;
 			s = (s * vo->volume) / 65536;
 			if(vo->channel > 0)
 			{
-				s = (s * VOLUME_SLIDER_LEVELS[volumeSlider[vo->channel==3 ? 1 : 0]]) / 4096;
+				s = (s * VOLUME_SLIDER_LEVELS[volume_slider[vo->channel==3 ? 1 : 0]]) / 4096;
 			}
 			accum += s;
 		}
@@ -93,419 +93,420 @@ void UPD937_Core::genSample(int out[])
 	}
 }
 
-void UPD937_Core::setChannelConfiguration(bool multi, bool all)
+void UPD937_Core::set_channel_configuration(bool multi, bool all)
 {
 	if(multi)
 	{
-		channels[0].firstVoice = 2*0;
-		channels[0].voiceCount = 2*6;
-		channels[1].firstVoice = 2*6;
-		channels[1].voiceCount = 2*4;
-		channels[2].firstVoice = 2*10;
-		channels[2].voiceCount = 2*2;
-		channels[3].firstVoice = 2*12;
-		channels[3].voiceCount = 2*4;
-		channels[0].midiEnabled = true;
-		channels[1].midiEnabled = true;
-		channels[2].midiEnabled = true;
-		channels[3].midiEnabled = all;
+		channels[0].first_voice = 2*0;
+		channels[0].voice_count = 2*6;
+		channels[1].first_voice = 2*6;
+		channels[1].voice_count = 2*4;
+		channels[2].first_voice = 2*10;
+		channels[2].voice_count = 2*2;
+		channels[3].first_voice = 2*12;
+		channels[3].voice_count = 2*4;
+		channels[0].midi_enabled = true;
+		channels[1].midi_enabled = true;
+		channels[2].midi_enabled = true;
+		channels[3].midi_enabled = all;
 	}
 	else
 	{
-		channels[0].firstVoice = 2*0;
-		channels[0].voiceCount = 2*12;
-		channels[0].midiEnabled = true;
-		channels[1].midiEnabled = false;
-		channels[2].midiEnabled = false;
-		channels[3].midiEnabled = false;
-		channels[1].voiceCount = 0;
-		channels[2].voiceCount = 0;
-		channels[3].voiceCount = 0;
+		channels[0].first_voice = 2*0;
+		channels[0].voice_count = 2*12;
+		channels[0].midi_enabled = true;
+		channels[1].midi_enabled = false;
+		channels[2].midi_enabled = false;
+		channels[3].midi_enabled = false;
+		channels[1].voice_count = 0;
+		channels[2].voice_count = 0;
+		channels[3].voice_count = 0;
 	}
 	for(int v = 0; v < 32; v++) voices[v].channel = 0;
 	for(int c = 1; c < 4; c++)
 	{
-		for(int v = 0; v < channels[c].voiceCount; v++)
+		for(int v = 0; v < channels[c].voice_count; v++)
 		{
-			voices[channels[c].firstVoice+v].channel = c;
+			voices[channels[c].first_voice+v].channel = c;
 		}
 	}
 	// TODO reset state?
 }
 
-void UPD937_Core::setVolumeSlider(int group, int slider)
+void UPD937_Core::set_volume_slider(int group, int slider)
 {
 	group = std::clamp(group, 0, 1);
 	slider = std::clamp(slider, 0, 4);
-	volumeSlider[group] = slider;
+	volume_slider[group] = slider;
 }
 
-void UPD937_Core::setChannelMuted(int channel, bool mute)
+void UPD937_Core::set_channel_muted(int channel, bool mute)
 {
 	channels[channel].mute = mute;
 }
 
-void UPD937_Core::resetChannels(bool clearProgram)
+void UPD937_Core::reset_channels(bool clear_program)
 {
-	int p = clearProgram ? 0 : 128;
-	progCh(0, p);
-	progCh(1, p);
-	progCh(2, p);
-	progCh(3, p);
+	int p = clear_program ? 0 : 128;
+	prog_chg(0, p);
+	prog_chg(1, p);
+	prog_chg(2, p);
+	prog_chg(3, p);
 }
 
-void UPD937_Core::processMidiNow(char midiByte)
+void UPD937_Core::process_midi_now(char midi_byte)
 {
 	// This function must be called from the audio thread!
 	// TODO: make thread safe?
-	int m = midiByte & 0xFF;
+	int m = midi_byte & 0xFF;
 	if(m >= 0x80)
 	{
 		// Status byte
-		if(m == 0xF0 && !midiInSysex) midiInSysex = true;
-		if(m == 0xF7 && midiInSysex)
+		if(m == 0xF0 && !midi_in_sysex) midi_in_sysex = true;
+		if(m == 0xF7 && midi_in_sysex)
 		{
-			midiInSysex = false;
+			midi_in_sysex = false;
 			// process sysex?
 		}
 		if(m < 0xF8)
 		{
-			midiStatus = m;
-			midiRunningStatus = (m < 0xF0) ? m : 0;
-			midiParamCount = 0;
+			midi_status = m;
+			midi_running_status = (m < 0xF0) ? m : 0;
+			midi_param_count = 0;
 		}
 	}
 	else
 	{
-		if(midiParamCount >= sizeof(midiParamBytes) || midiStatus == 0) return;
-		midiParamBytes[midiParamCount++] = (char)(m&0x7F);
-		if(midiInSysex) return;
-		int statusHi = midiStatus>>4;
-		if(statusHi == 0xF)
+		if(midi_param_count >= sizeof(midi_param_bytes) || midi_status == 0) return;
+		midi_param_bytes[midi_param_count++] = (char)(m&0x7F);
+		if(midi_in_sysex) return;
+		int status_hi = midi_status>>4;
+		if(status_hi == 0xF)
 		{
 			// Process F0-F7 statuses
 		}
 		else
 		{
-			int channel = midiStatus&0x0F;
-			int msize = (statusHi==0xC || statusHi==0xD) ? 1 : 2;
-			if(midiParamCount >= msize && !midiInSysex)
+			int channel = midi_status&0x0F;
+			int message_size = (status_hi==0xC || status_hi==0xD) ? 1 : 2;
+			if(midi_param_count >= message_size && !midi_in_sysex)
 			{
-				if(channels[channel].midiEnabled)
+				if(channels[channel].midi_enabled)
 				{
-					switch(statusHi)
+					switch(status_hi)
 					{
 					case 0x8:
-						noteOff(channel, midiParamBytes[0]);
+						note_off(channel, midi_param_bytes[0]);
 						break;
 					case 0x9:
-						if(midiParamBytes[1] > 0) noteOn(channel, midiParamBytes[0]);
-						else noteOff(channel, midiParamBytes[0]);
+						if(midi_param_bytes[1] > 0) note_on(channel, midi_param_bytes[0]);
+						else note_off(channel, midi_param_bytes[0]);
 						break;
 					case 0xA:
 						printf("[Sound] unhandled message KEY PRESSURE\n");
 						break;
 					case 0xB:
-						if(midiParamBytes[0] == 0x40)
+						if(midi_param_bytes[0] == 0x40)
 						{
-							controlChgSustain(channel, (midiParamBytes[1] >= 0x40));
+							control_chg_sustain(channel, (midi_param_bytes[1] >= 0x40));
 						}
 						else
 						{
-							printf("[Sound] unhandled message CONTROL CHANGE %02X %02X\n", midiParamBytes[0], midiParamBytes[1]);
+							printf("[Sound] unhandled message CONTROL CHANGE %02X %02X\n", midi_param_bytes[0], midi_param_bytes[1]);
 						}
 						break;
 					case 0xC:
-						progCh(channel, midiParamBytes[0]);
+						prog_chg(channel, midi_param_bytes[0]);
 						break;
 					case 0xD:
 						printf("[Sound] unhandled message CHANNEL PRESSURE\n");
 						break;
 					case 0xE:
-						pitchBend(channel, (midiParamBytes[1]<<1) | (midiParamBytes[1]>>6));
+						pitch_bend(channel, (midi_param_bytes[1]<<1) | (midi_param_bytes[1]>>6));
 						break;
 					case 0xF:
 					default:
 						break;
 					}
 				}
-				midiParamCount = 0;
-				midiStatus = midiRunningStatus;
+				midi_param_count = 0;
+				midi_status = midi_running_status;
 			}
 		}
 	}
 }
 
-int UPD937_Core::readRom8(int offset)
+int UPD937_Core::read_rom_8(int offset)
 {
-	return rom[offset&rommask]&0xFF;
+	return rom[offset&rom_mask]&0xFF;
 }
 
-int UPD937_Core::readRom16(int offset)
+int UPD937_Core::read_rom_16(int offset)
 {
-	return ((rom[(offset+1)&rommask]&0xFF)<<8)|(rom[offset&rommask]&0xFF);
+	return ((rom[(offset+1)&rom_mask]&0xFF)<<8)|(rom[offset&rom_mask]&0xFF);
 }
 
-int UPD937_Core::readRom24(int offset)
+int UPD937_Core::read_rom_24(int offset)
 {
-	return ((rom[(offset+2)&rommask]&0xFF)<<16)|((rom[(offset+1)&rommask]&0xFF)<<8)|(rom[offset&rommask]&0xFF);
+	return ((rom[(offset+2)&rom_mask]&0xFF)<<16)|((rom[(offset+1)&rom_mask]&0xFF)<<8)|(rom[offset&rom_mask]&0xFF);
 }
 
-void UPD937_Core::updateSample()
+void UPD937_Core::update_sample()
 {
 	// Clock the volume & pitch envelope generators
-	if((sampleCount%384) == 0) updateVolumeEnvelopes();
-	int clk2div = (int) round(CLK2_DIVP * synthesisRate);
-	clk2Counter += CLK2_MUL;
-	if(clk2Counter >= clk2div)
+	if((sample_count%384) == 0) update_volume_envelopes();
+	int clk2_div = (int) round(CLK2_DIVP * synthesis_rate);
+	clk2_counter += CLK2_MUL;
+	if(clk2_counter >= clk2_div)
 	{
-		//printf("[Sound] CLK2 %08X %d %d %d %.2f\n", clk2Counter, CLK2_MUL, clk2div, CLK2_DIVP, synthesisRate);
-		updatePitchEnvelopes();
-		clk2Counter -= clk2div;
+		update_pitch_envelopes();
+		clk2_counter -= clk2_div;
 	}
 
 	// Update volume/pitch ramps
-	for(int i = 0; i < 32; i++)
+	for(int v = 0; v < 32; v++)
 	{
-		UPD937_VoiceState *vo = &voices[i];
-		vo->volumeRateCounter++;
-		if(vo->volumeRateCounter >= vo->volumeRateDiv)
+		UPD937_VoiceState *vo = &voices[v];
+		vo->volume_rate_counter++;
+		if(vo->volume_rate_counter >= vo->volume_rate_div)
 		{
-			vo->volumeRateCounter = 0;
-			if(vo->volumeDown)
+			vo->volume_rate_counter = 0;
+			if(vo->volume_down)
 			{
-				vo->volume = std::clamp(std::max(vo->volumeTarget, vo->volume - vo->volumeRateMul), 0, 65535);
+				vo->volume = std::clamp(std::max(vo->volume_target, vo->volume - vo->volume_rate_mul), 0, 65535);
 			}
 			else
 			{
-				vo->volume = std::clamp(std::min(vo->volumeTarget, vo->volume + vo->volumeRateMul), 0, 65535);
+				vo->volume = std::clamp(std::min(vo->volume_target, vo->volume + vo->volume_rate_mul), 0, 65535);
 			}
 		}
 		if(vo->volume > 0)
 		{
-			int pitchRelative = vo->pitch;
-			pitchRelative += vo->pitchEnvValue/16;
-			pitchRelative += channels[vo->channel].bendOffset;
-			//if(pitchRelative < 0) pitchRelative = 0;
-			//if(pitchRelative > 0x5FF) pitchRelative = 0x5FF;
-			vo->sampFract += readRom16(ptr_pitchtable + pitchRelative*2);
-			if(vo->sampFract >= 0x8000)
+			int pitch_relative = vo->pitch;
+			pitch_relative += vo->pitch_env_value/16;
+			pitch_relative += channels[vo->channel].bend_offset;
+			//if(pitch_relative < 0) pitch_relative = 0;
+			//if(pitch_relative > 0x5FF) pitch_relative = 0x5FF;
+			vo->sample_fract += read_rom_16(ptr_pitchtable + pitch_relative*2);
+			if(vo->sample_fract >= 0x8000)
 			{
-				vo->sampFract -= 0x8000;
-				vo->sampLastVal = (readRom16(vo->sampPtr*2)>>4) - 0x800;
-				vo->sampPtr++;
+				vo->sample_fract -= 0x8000;
+				vo->sample_last_val = (read_rom_16(vo->sample_ptr*2)>>4) - 0x800;
+				vo->sample_ptr++;
 			}
-			if(vo->sampPtr > vo->sampEnd) vo->sampPtr = vo->sampLoop;
+			if(vo->sample_ptr > vo->sample_end) vo->sample_ptr = vo->sample_loop;
 		}
 	}
 
-	sampleCount++;
+	sample_count++;
 }
 
-void UPD937_Core::updateVolumeEnvelopes()
+void UPD937_Core::update_volume_envelopes()
 {
-	delayUpdatePhase = (delayUpdatePhase+1)&1;
+	delay_update_phase = (delay_update_phase+1)&1;
 	// Do all at once for now
-	for(int i = 0; i < 32; i++)
+	for(int v = 0; v < 32; v++)
 	{
-		UPD937_VoiceState *vo = &voices[i];
+		UPD937_VoiceState *vo = &voices[v];
 		bool changed = false;
-		if(vo->volEnvDelay > 0)
+		if(vo->volume_env_delay > 0)
 		{
 			// Update delay
-			if(delayUpdatePhase == 0) vo->volEnvDelay--;
-			if(vo->volEnvDelay > 0) continue;
+			if(delay_update_phase == 0) vo->volume_env_delay--;
+			if(vo->volume_env_delay > 0) continue;
 			else if(vo->active) changed = true;
 		}
-		if(vo->volEnvStep < 16 && vo->volume > 0 && !vo->active)
+		if(vo->volume_env_step < 16 && vo->volume > 0 && !vo->active)
 		{
 			// If key released, enter release phase at same step
-			vo->volEnvStep |= 16;
+			vo->volume_env_step |= 16;
 			changed = true;
 		}
 		else
 		{
 			// If reached target and not ended, advance to next step
-			if((vo->volume <= vo->volumeTarget && vo->volumeDown) || (vo->volume >= vo->volumeTarget && !vo->volumeDown))
+			if((vo->volume <= vo->volume_target && vo->volume_down) || (vo->volume >= vo->volume_target && !vo->volume_down))
 			{
-				if(vo->volumeTarget > 0 && vo->volumeRateMul != 0)
+				if(vo->volume_target > 0 && vo->volume_rate_mul != 0)
 				{
-					vo->volEnvStep = ((vo->volEnvStep+1)&15) + (vo->volEnvStep&16); // Wrap after 16 steps, stay in same phase
+					vo->volume_env_step = ((vo->volume_env_step+1)&15) + (vo->volume_env_step&16); // Wrap after 16 steps, stay in same phase
 					changed = true;
 				}
 			}
 		}
-		bool alreadyReset = false;
+		bool already_reset = false;
 		while(changed)
 		{
 			changed = false;
-			int envRate = readRom8(ptr_volenv + vo->volEnv*64 + vo->volEnvStep*2 + 0);
-			int envTarget = readRom8(ptr_volenv + vo->volEnv*64 + vo->volEnvStep*2 + 1);
-			bool envDown = (envRate>=128);
-			envRate &= 127;
-			int envTargetV = readRom16(ptr_voltable + envTarget*2);
+			int env_rate = read_rom_8(ptr_volenv + vo->volume_env*64 + vo->volume_env_step*2 + 0);
+			int env_target = read_rom_8(ptr_volenv + vo->volume_env*64 + vo->volume_env_step*2 + 1);
+			bool env_down = (env_rate>=128);
+			env_rate &= 127;
+			int env_volume_target = read_rom_16(ptr_voltable + env_target*2);
 			// Always process as regular envelope step
-			vo->volumeDown = envDown;
-			if(envRate == 127)
+			vo->volume_down = env_down;
+			if(env_rate == 127)
 			{
 				// Instant apply
-				vo->volumeRateMul = 0xFFFF;
-				vo->volumeRateDiv = 1;
+				vo->volume_rate_mul = 0xFFFF;
+				vo->volume_rate_div = 1;
 			}
-			else if(envRate == 0 && envDown)
-			{ // TODO proper check for condition where target decreased by 1?
+			else if(env_rate == 0 && env_down)
+			{
+				// TODO proper check for condition where target decreased by 1?
 				// Hold condition
-				vo->volumeRateMul = 0;
-				vo->volumeRateDiv = 1;
+				vo->volume_rate_mul = 0;
+				vo->volume_rate_div = 1;
 			}
 			// TODO check old target before mapping
-			//else if(((envTargetV < vo->volumeTarget) && !envDown) || ((envTargetV > vo->volumeTarget) && envDown) && !alreadyReset)
-			else if(envTargetV == 0 && !envDown && !alreadyReset)
+			//else if(((env_volume_target < vo->volume_target) && !env_down) || ((env_volume_target > vo->volume_target) && env_down) && !already_reset)
+			else if(env_volume_target == 0 && !env_down && !already_reset)
 			{
 				// Sign mismatch, invalid, reset/loop
 				// Real firmware gets stuck in infinite loop if first step is invalid, here we avoid that
 				// This is used intentionally by some envelopes for looping on "00 00"
-				vo->volEnvStep &= 16;
-				alreadyReset = true;
+				vo->volume_env_step &= 16;
+				already_reset = true;
 				changed = true;
 			}
 			else
 			{
 				// Regular ramp
-				envRate = (envRate*2) + 2;
-				vo->volumeRateMul = readRom16(ptr_ratetable + envRate*4 + 0);
-				vo->volumeRateDiv = readRom8(ptr_ratetable + envRate*4 + 2)+1;
+				env_rate = (env_rate*2) + 2;
+				vo->volume_rate_mul = read_rom_16(ptr_ratetable + env_rate*4 + 0);
+				vo->volume_rate_div = read_rom_8(ptr_ratetable + env_rate*4 + 2)+1;
 			}
-			vo->volumeTarget = envTargetV;
+			vo->volume_target = env_volume_target;
 		}
 	}
 }
 
-void UPD937_Core::updatePitchEnvelopes()
+void UPD937_Core::update_pitch_envelopes()
 {
 	// Do all at once for now
-	for(int i = 0; i < 32; i++)
+	for(int v = 0; v < 32; v++)
 	{
-		UPD937_VoiceState *vo = &voices[i];
+		UPD937_VoiceState *vo = &voices[v];
 		if(vo->volume == 0) continue; // TODO is this a valid check for this?
 		bool changed = false;
 		// Update delay
-		if(vo->pitchEnvDelay > 0)
+		if(vo->pitch_env_delay > 0)
 		{
-			vo->pitchEnvDelay--;
-			if(vo->pitchEnvDelay > 0) continue;
+			vo->pitch_env_delay--;
+			if(vo->pitch_env_delay > 0) continue;
 			else changed = true;
 		}
 
 		// Update pitch ramp
-		if(vo->pitchEnvRate != 0)
+		if(vo->pitch_env_rate != 0)
 		{
-			vo->pitchEnvValue += vo->pitchEnvRate;
-			bool reachedTarget = false;
-			if(vo->pitchEnvRate > 0) reachedTarget = (vo->pitchEnvValue >= vo->pitchEnvTarget);
-			else reachedTarget = (vo->pitchEnvValue <= vo->pitchEnvTarget);
-			if(reachedTarget)
+			vo->pitch_env_value += vo->pitch_env_rate;
+			bool reached_target = false;
+			if(vo->pitch_env_rate > 0) reached_target = (vo->pitch_env_value >= vo->pitch_env_target);
+			else reached_target = (vo->pitch_env_value <= vo->pitch_env_target);
+			if(reached_target)
 			{
-				vo->pitchEnvValue = vo->pitchEnvTarget;
-				vo->pitchEnvStep++;
-				if(vo->pitchEnvStep >= 8) vo->pitchEnvStep = 1; // Should it loop like this?
+				vo->pitch_env_value = vo->pitch_env_target;
+				vo->pitch_env_step++;
+				if(vo->pitch_env_step >= 8) vo->pitch_env_step = 1; // Should it loop like this?
 				changed = true;
 			}
 		}
 
-		bool alreadyLooped = false;
-		while(changed && vo->pitchEnvStep < 8)
+		bool already_looped = false;
+		while(changed && vo->pitch_env_step < 8)
 		{
 			changed = false;
-			int envRate = readRom16(ptr_pitchenv + vo->pitchEnv*32 + vo->pitchEnvStep*4 + 0);
-			int envTarget = readRom16(ptr_pitchenv + vo->pitchEnv*32 + vo->pitchEnvStep*4 + 2);
-			bool loopFlag = (envRate&0x2000) > 0;
-			bool envDown = (envRate&0x1000) > 0;
-			envRate &= 0xFFF;
-			if(loopFlag)
+			int env_rate = read_rom_16(ptr_pitchenv + vo->pitch_env*32 + vo->pitch_env_step*4 + 0);
+			int env_target = read_rom_16(ptr_pitchenv + vo->pitch_env*32 + vo->pitch_env_step*4 + 2);
+			bool loop_flag = (env_rate&0x2000) > 0;
+			bool env_down = (env_rate&0x1000) > 0;
+			env_rate &= 0xFFF;
+			if(loop_flag)
 			{
-				vo->pitchEnvStep = envRate&7;
-				changed = !alreadyLooped;
-				alreadyLooped = true;
+				vo->pitch_env_step = env_rate&7;
+				changed = !already_looped;
+				already_looped = true;
 			}
 			else
 			{
-				vo->pitchEnvRate = envRate * (envDown ? -1 : 1);
-				vo->pitchEnvTarget += envTarget * (envDown ? -16 : 16);
+				vo->pitch_env_rate = env_rate * (env_down ? -1 : 1);
+				vo->pitch_env_target += env_target * (env_down ? -16 : 16);
 			}
 		}
 	}
 }
 
-int UPD937_Core::getFreeVoice(int c)
+int UPD937_Core::get_free_voice(int c)
 {
 	// TODO make this operate on allocation pairs not real voices
 	UPD937_ChannelState *ch = &channels[c];
 
 	// Find first inactive from current position
-	int ret = ch->firstVoice + ch->allocateNext;
-	for(int i = 0; i < ch->voiceCount; i++)
+	int ret = ch->first_voice + ch->allocate_next;
+	for(int i = 0; i < ch->voice_count; i++)
 	{
 		if(!(voices[ret].active)) break;
-		ch->allocateNext++;
-		if(ch->allocateNext >= ch->voiceCount) ch->allocateNext = 0;
-		ret = ch->firstVoice + ch->allocateNext;
+		ch->allocate_next++;
+		if(ch->allocate_next >= ch->voice_count) ch->allocate_next = 0;
+		ret = ch->first_voice + ch->allocate_next;
 	}
 
 	// Start from next voice next time
-	ch->allocateNext++;
-	if(ch->allocateNext >= ch->voiceCount) ch->allocateNext = 0;
+	ch->allocate_next++;
+	if(ch->allocate_next >= ch->voice_count) ch->allocate_next = 0;
 
 	return ret;
 }
 
-void UPD937_Core::noteOn(int channel, int note)
+void UPD937_Core::note_on(int channel, int note)
 {
 	if(channel < 0 || channel > 3) return;
 	UPD937_ChannelState *ch = &channels[channel];
 	note &= 127;
-	int noteRanged = note;
-	while(noteRanged < 36) noteRanged += 12;
-	while(noteRanged > 96) noteRanged -= 12;
+	int note_ranged = note;
+	while(note_ranged < 36) note_ranged += 12;
+	while(note_ranged > 96) note_ranged -= 12;
 
 	// Get instrument descriptor
-	int partialAddr = ch->partialsOffset;
+	int partial_addr = ch->partials_offset;
+	int voices_per_note = ch->layered ? 4 : 2;
 
 	// Get keymap and update partial address
-	int kmByte = (noteRanged-36)/2;
-	int kmShift = ((noteRanged-36)&1)*4;
-	int kmVal = (readRom8(ptr_keymaps + ch->keymapNo*32 + kmByte) >> kmShift) & 0xF;
-	partialAddr += kmVal * (ch->layered?12:6);
+	int keymap_byte = (note_ranged-36)/2;
+	int keymap_shift = ((note_ranged-36)&1)*4;
+	int keymap_val = (read_rom_8(ptr_keymaps + ch->keymap_no*32 + keymap_byte) >> keymap_shift) & 0xF;
 
 	// Get partial
+	partial_addr += keymap_val * voices_per_note * 3;
 	// TODO: From here layering needs to be implemented with allocating extra voices
-	partialAddr *= 2;
+	partial_addr *= 2;
 
-	for(int vn = 0; vn < (ch->layered?4:2); vn++)
+	for(int vn = 0; vn < voices_per_note; vn++)
 	{
-		UPD937_VoiceState *vo = &voices[getFreeVoice(channel)];
+		UPD937_VoiceState *vo = &voices[get_free_voice(channel)];
 
 		// Set basic parameters from the partial
-		vo->pitchEnv = readRom16(ptr_partials + partialAddr + 0);
-		vo->volEnv = readRom16(ptr_partials + partialAddr + 2);
-		int samp = readRom16(ptr_partials + partialAddr + 4);
+		vo->pitch_env = read_rom_16(ptr_partials + partial_addr + 0);
+		vo->volume_env = read_rom_16(ptr_partials + partial_addr + 2);
+		int sample_descriptor = read_rom_16(ptr_partials + partial_addr + 4);
 
 		// Get sample data
-		vo->sampStart = readRom24(ptr_sampdesc + samp*10 + 1);
-		vo->sampEnd = readRom24(ptr_sampdesc + samp*10 + 4);
-		vo->sampLoop = readRom24(ptr_sampdesc + samp*10 + 7);
+		vo->sample_start = read_rom_24(ptr_sampdesc + sample_descriptor*10 + 1);
+		vo->sample_end = read_rom_24(ptr_sampdesc + sample_descriptor*10 + 4);
+		vo->sample_loop = read_rom_24(ptr_sampdesc + sample_descriptor*10 + 7);
 
 		// Initialize sampler
-		vo->sampPtr = vo->sampStart;
-		vo->sampFract = 0;
-		vo->sampLastVal = 0; // Hardware might not do this
+		vo->sample_ptr = vo->sample_start;
+		vo->sample_fract = 0;
+		vo->sample_last_val = 0; // Hardware might not do this
 
 		// Set note
 		vo->note = note;
-		int sampleNote = readRom8(ptr_sampdesc + samp*10);
-		if(sampleNote > 0)
+		int sample_note = read_rom_8(ptr_sampdesc + sample_descriptor*10);
+		if(sample_note > 0)
 		{
-			vo->pitch = (noteRanged - sampleNote) * 32;
+			vo->pitch = (note_ranged - sample_note) * 32;
 		}
 		else
 		{
@@ -514,342 +515,342 @@ void UPD937_Core::noteOn(int channel, int note)
 
 		// Setup envelope
 		vo->volume = 0;
-		vo->volumeTarget = 0;
-		vo->volumeRateMul = 0;
-		vo->volumeRateDiv = 1;
-		vo->volumeDown = false;
-		vo->volEnvDelay = 0;
-		vo->volEnvStep = 0;
+		vo->volume_target = 0;
+		vo->volume_rate_mul = 0;
+		vo->volume_rate_div = 1;
+		vo->volume_down = false;
+		vo->volume_env_delay = 0;
+		vo->volume_env_step = 0;
 
 		// Read first step of envelope
-		int envRate = readRom8(ptr_volenv + vo->volEnv*64 + 0);
-		int envTarget = readRom8(ptr_volenv + vo->volEnv*64 + 1);
-		if(envTarget == 0)
+		int env_rate = read_rom_8(ptr_volenv + vo->volume_env*64 + 0);
+		int env_target = read_rom_8(ptr_volenv + vo->volume_env*64 + 1);
+		if(env_target == 0)
 		{
 			// This is a delay step
-			vo->volEnvDelay = envRate+1;
-			vo->volEnvStep = 1;
+			vo->volume_env_delay = env_rate+1;
+			vo->volume_env_step = 1;
 		}
 		else
 		{
 			// Regular envelope step
-			vo->volumeDown = (envRate>=128);
-			envRate &= 127;
-			vo->volumeTarget = readRom16(ptr_voltable + envTarget*2);
-			if(envRate == 127)
+			vo->volume_down = (env_rate>=128);
+			env_rate &= 127;
+			vo->volume_target = read_rom_16(ptr_voltable + env_target*2);
+			if(env_rate == 127)
 			{
-				vo->volumeRateMul = 0xFFFF;
-				vo->volumeRateDiv = 1;
+				vo->volume_rate_mul = 0xFFFF;
+				vo->volume_rate_div = 1;
 			}
 			else
 			{
-				envRate = (envRate*2) + 2;
-				vo->volumeRateMul = readRom16(ptr_ratetable + envRate*4 + 0);
-				vo->volumeRateDiv = readRom8(ptr_ratetable + envRate*4 + 2)+1;
+				env_rate = (env_rate*2) + 2;
+				vo->volume_rate_mul = read_rom_16(ptr_ratetable + env_rate*4 + 0);
+				vo->volume_rate_div = read_rom_8(ptr_ratetable + env_rate*4 + 2)+1;
 			}
 		}
 
 		// Set pitch envelope
-		int pitchInitial = readRom16(ptr_pitchenv + vo->pitchEnv*32 + 0);
-		pitchInitial = (pitchInitial&0xFFF) * ((pitchInitial>=0x1000) ? -1 : 1);
-		vo->pitchEnvValue = vo->pitchEnvTarget = pitchInitial*16;
-		vo->pitchEnvRate = 0;
-		vo->pitchEnvDelay = readRom16(ptr_pitchenv + vo->pitchEnv*32 + 2) + 1;
-		vo->pitchEnvStep = 1;
+		int pitch_initial = read_rom_16(ptr_pitchenv + vo->pitch_env*32 + 0);
+		pitch_initial = (pitch_initial&0xFFF) * ((pitch_initial>=0x1000) ? -1 : 1);
+		vo->pitch_env_value = vo->pitch_env_target = pitch_initial*16;
+		vo->pitch_env_rate = 0;
+		vo->pitch_env_delay = read_rom_16(ptr_pitchenv + vo->pitch_env*32 + 2) + 1;
+		vo->pitch_env_step = 1;
 
 		vo->active = true;
 		vo->sustained = false;
 
-		partialAddr += 6;
+		partial_addr += 6;
 	}
 }
 
-void UPD937_Core::noteOff(int channel, int note)
+void UPD937_Core::note_off(int channel, int note)
 {
 	if(channel < 0 || channel > 3) return;
 	UPD937_ChannelState *ch = &channels[channel];
 	note &= 127;
-	int voicesPerNote = ch->layered ? 4 : 2;
-	for(int i = ch->firstVoice; i < ch->firstVoice+ch->voiceCount; i += voicesPerNote)
+	int voices_per_note = ch->layered ? 4 : 2;
+	for(int v = ch->first_voice; v < ch->first_voice+ch->voice_count; v += voices_per_note)
 	{
-		UPD937_VoiceState *vo = &voices[i];
+		UPD937_VoiceState *vo = &voices[v];
 		if(vo->note == note && vo->active && !vo->sustained)
 		{
-			for(int j = 0; j < voicesPerNote; j++)
+			for(int i = 0; i < voices_per_note; i++)
 			{
-				if(ch->sustain) voices[i+j].sustained = true;
-				else voices[i+j].active = false;
+				if(ch->sustain) voices[v+i].sustained = true;
+				else voices[v+i].active = false;
 			}
 			break;
 		}
 	}
 }
 
-void UPD937_Core::progCh(int channel, int prog)
+void UPD937_Core::prog_chg(int channel, int prog)
 {
 	if(channel < 0 || channel > 3) return;
 	UPD937_ChannelState *ch = &channels[channel];
 	// Silence all notes on this channel by decaying over a 512 sample period
-	for(int i = ch->firstVoice; i < ch->firstVoice+ch->voiceCount; i++)
+	for(int v = ch->first_voice; v < ch->first_voice+ch->voice_count; v++)
 	{
-		voices[i].active = false;
-		voices[i].sustained = false;
-		voices[i].volumeRateMul = (voices[i].volume+511)/512;
-		voices[i].volumeRateDiv = 1;
-		voices[i].volumeTarget = 0;
-		voices[i].volumeDown = true;
-		voices[i].volEnvStep = 16; // hack to make it think it's in release phase
+		voices[v].active = false;
+		voices[v].sustained = false;
+		voices[v].volume_rate_mul = (voices[v].volume+511)/512;
+		voices[v].volume_rate_div = 1;
+		voices[v].volume_target = 0;
+		voices[v].volume_down = true;
+		voices[v].volume_env_step = 16; // hack to make it think it's in release phase
 	}
-	ch->allocateNext = 0;
+	ch->allocate_next = 0;
 	// Check if new program is valid AFTER silencing notes
 	if(prog < 0 || prog > 109) return;
-	prog = midiProgToBank(prog, 0);
+	prog = midi_prog_to_bank(prog, 0);
 	// Update channel's instrument parameters
 	ch->instrument = prog;
-	ch->partialsOffset = readRom16(ptr_instdesc + prog*4 + 0);
-	ch->keymapNo = readRom8(ptr_instdesc + prog*4 + 2);
-	int flags = readRom8(ptr_instdesc + prog*4 + 3);
+	ch->partials_offset = read_rom_16(ptr_instdesc + prog*4 + 0);
+	ch->keymap_no = read_rom_8(ptr_instdesc + prog*4 + 2);
+	int flags = read_rom_8(ptr_instdesc + prog*4 + 3);
 	ch->layered = (flags & 0x10) > 0;
 }
 
-void UPD937_Core::pitchBend(int channel, int bendByte)
+void UPD937_Core::pitch_bend(int channel, int bend_byte)
 {
 	if(channel < 0 || channel > 3) return;
 	UPD937_ChannelState *ch = &channels[channel];
-	ch->bendValue = bendByte-128;
-	ch->bendOffset = readRom8(ptr_ratetable + bendByte*4 + 3) - 128;
+	ch->bend_value = bend_byte-128;
+	ch->bend_offset = read_rom_8(ptr_ratetable + bend_byte*4 + 3) - 128;
 }
 
-void UPD937_Core::controlChgSustain(int channel, bool sustain)
+void UPD937_Core::control_chg_sustain(int channel, bool sustain)
 {
 	if(channel < 0 || channel > 3) return;
 	UPD937_ChannelState *ch = &channels[channel];
 	ch->sustain = sustain;
 	if(!sustain)
 	{
-		for(int i = ch->firstVoice; i < ch->firstVoice+ch->voiceCount; i++)
+		for(int i = ch->first_voice; i < ch->first_voice+ch->voice_count; i++)
 		{
 			if(voices[i].sustained) voices[i].sustained = voices[i].active = false;
 		}
 	}
 }
 
-int UPD937_Core::midiProgToBank(int prog, int bankSelect)
+int UPD937_Core::midi_prog_to_bank(int prog, int bank_select)
 {
-	if(prog < 10) return prog+(bankSelect*10);
-	return prog-10 + bankSelect*100 + HC_NUM_BANKS*10;
+	if(prog < 10) return prog+(bank_select*10);
+	return prog-10 + bank_select*100 + HC_NUM_BANKS*10;
 }
 
-LoopySound::LoopySound(std::vector<uint8_t>& romIn, float outRate, int bufferSize)
+LoopySound::LoopySound(std::vector<uint8_t>& rom_in, float out_rate, int buffer_size)
 {
-	this->outRate = outRate;
-	this->synthRate = TUNING * 192;
-	this->mixLevel = MIX_LEVEL;
-	this->bufferSize = bufferSize;
-	printf("[Sound] Init uPD937 core: synth rate %.01f, out rate %.01f, buffer size %d\n", synthRate, outRate, bufferSize);
-	synth = std::make_unique<UPD937_Core>(romIn, synthRate);
+	this->out_rate = out_rate;
+	this->synth_rate = TUNING * 192;
+	this->mix_level = MIX_LEVEL;
+	this->buffer_size = buffer_size;
+	printf("[Sound] Init uPD937 core: synth rate %.01f, out rate %.01f, buffer size %d\n", synth_rate, out_rate, buffer_size);
+	synth = std::make_unique<UPD937_Core>(rom_in, synth_rate);
 	if(FILTER_ENABLE)
 	{
 		printf("[Sound] Init filters\n");
-		filterTone = std::make_unique<BiquadStereoFilter>(synthRate, FILTER_CUTOFF, FILTER_RESONANCE, false);
-		filterBlockDC = std::make_unique<BiquadStereoFilter>(outRate, 20.f, 0.7f, true);
+		filter_tone = std::make_unique<BiquadStereoFilter>(synth_rate, FILTER_CUTOFF, FILTER_RESONANCE, false);
+		filter_block_dc = std::make_unique<BiquadStereoFilter>(out_rate, 20.f, 0.7f, true);
 	}
 	else
 	{
-		filterTone = nullptr;
-		filterBlockDC = nullptr;
+		filter_tone = nullptr;
+		filter_block_dc = nullptr;
 	}
 }
 
-void LoopySound::genSample(float out[])
+void LoopySound::gen_sample(float out[])
 {
 	// Process midi events every 64 samples
-	if((outSampleCount & 63) == 0)
+	if((out_sample_count & 63) == 0)
 	{
-		handleMidiEvent();
+		handle_midi_event();
 	}
-	interpolationStep += synthRate / outRate;
-	while(interpolationStep >= 1.f)
+	interpolation_step += synth_rate / out_rate;
+	while(interpolation_step >= 1.f)
 	{
-		lastSample[0] = currentSample[0];
-		lastSample[1] = currentSample[1];
-		synth->genSample(rawSamples);
+		last_sample[0] = current_sample[0];
+		last_sample[1] = current_sample[1];
+		synth->gen_sample(raw_samples);
 		// Get synth sample and filter it at synth rate
-		currentSample[0] = rawSamples[0] / 32768.f;
-		currentSample[1] = rawSamples[1] / 32768.f;
-		if(filterTone) filterTone->process(currentSample);
-		interpolationStep--;
+		current_sample[0] = raw_samples[0] / 32768.f;
+		current_sample[1] = raw_samples[1] / 32768.f;
+		if(filter_tone) filter_tone->process(current_sample);
+		interpolation_step--;
 	}
 	// Resample and mix at out rate
-	mixSample[0] = (lastSample[0] + (currentSample[0]-lastSample[0]) * interpolationStep) * 6.8f * mixLevel;
-	mixSample[1] = (lastSample[1] + (currentSample[1]-lastSample[1]) * interpolationStep) * 6.8f * mixLevel;
-	if(filterBlockDC) filterBlockDC->process(mixSample);
+	mix_sample[0] = (last_sample[0] + (current_sample[0]-last_sample[0]) * interpolation_step) * 6.8f * mix_level;
+	mix_sample[1] = (last_sample[1] + (current_sample[1]-last_sample[1]) * interpolation_step) * 6.8f * mix_level;
+	if(filter_block_dc) filter_block_dc->process(mix_sample);
 	// Write output
-	out[0] = std::clamp(mixSample[0], -1.f, 1.f);
-	out[1] = std::clamp(mixSample[1], -1.f, 1.f);
-	outSampleCount++;
+	out[0] = std::clamp(mix_sample[0], -1.f, 1.f);
+	out[1] = std::clamp(mix_sample[1], -1.f, 1.f);
+	out_sample_count++;
 }
 
-void LoopySound::setChannelMuted(int channel, bool mute)
+void LoopySound::set_channel_muted(int channel, bool mute)
 {
-	synth->setChannelMuted(channel, mute);
+	synth->set_channel_muted(channel, mute);
 }
 
-void LoopySound::timeReference(float delta)
+void LoopySound::time_reference(float delta)
 {
-	hasTimeReference = true;
+	has_time_reference = true;
 	if(delta > 0)
 	{
-		int deltaSamples = (int)floor(delta * outRate);
-		timeReferenceSamples += deltaSamples;
+		int delta_samples = (int)floor(delta * out_rate);
+		time_reference_samples += delta_samples;
 	}
 
 	// Hard correction, keep within sane distance of local time
-	if(timeReferenceSamples < outSampleCount)
+	if(time_reference_samples < out_sample_count)
 	{
-		timeReferenceSamples = outSampleCount;
+		time_reference_samples = out_sample_count;
 	}
-	else if(timeReferenceSamples > outSampleCount + (2 * bufferSize))
+	else if(time_reference_samples > out_sample_count + (2 * buffer_size))
 	{
-		timeReferenceSamples = outSampleCount + (2 * bufferSize);
+		time_reference_samples = out_sample_count + (2 * buffer_size);
 	}
 
 	// Soft correction, slowly drift towards local time (middle of hard range)
 	// This introduces some relative error but biases it to hit hard limits less often
-	timeReferenceSamples += (outSampleCount + bufferSize - timeReferenceSamples + 32) >> 6;
+	time_reference_samples += (out_sample_count + buffer_size - time_reference_samples + 32) >> 6;
 }
 
-void LoopySound::setControlRegister(int creg)
+void LoopySound::set_control_register(int creg)
 {
 	creg &= 0xFFF;
 	// Handle volume sliders
-	int volSw0 = (creg>>6)&7;
-	int volSw1 = (creg>>9)&7;
-	if((volSw0&1) > 0) synth->setVolumeSlider(0, 2);
-	else if((volSw0&2) > 0) synth->setVolumeSlider(0, 3);
-	else if((volSw0&4) > 0) synth->setVolumeSlider(0, 4);
-	if((volSw1&1) > 0) synth->setVolumeSlider(1, 2);
-	else if((volSw1&2) > 0) synth->setVolumeSlider(1, 3);
-	else if((volSw1&4) > 0) synth->setVolumeSlider(1, 4);
+	int vol_sw_0 = (creg>>6)&7;
+	int vol_sw_1 = (creg>>9)&7;
+	if((vol_sw_0&1) > 0) synth->set_volume_slider(0, 2);
+	else if((vol_sw_0&2) > 0) synth->set_volume_slider(0, 3);
+	else if((vol_sw_0&4) > 0) synth->set_volume_slider(0, 4);
+	if((vol_sw_1&1) > 0) synth->set_volume_slider(1, 2);
+	else if((vol_sw_1&2) > 0) synth->set_volume_slider(1, 3);
+	else if((vol_sw_1&4) > 0) synth->set_volume_slider(1, 4);
 	// Handle buttons
 	int buttons = creg&63;
-	int buttonsPushed = buttons & (~buttonsLast);
-	buttonsLast = buttons;
+	int buttons_pushed = buttons & (~buttons_last);
+	buttons_last = buttons;
 	// Check button pushes with priority order
-	if((buttonsPushed&16) > 0)
+	if((buttons_pushed&16) > 0)
 	{
 		// ON
-		channelConfigState = 0;
-		synth->setChannelConfiguration(false, false);
-		synth->resetChannels(true);
+		channel_config_state = 0;
+		synth->set_channel_configuration(false, false);
+		synth->reset_channels(true);
 	}
-	if((buttonsPushed&1) > 0)
+	if((buttons_pushed&1) > 0)
 	{
 		// DEMO
 		// temporarily just silence channels when entering demo mode
-		inDemo = !inDemo;
-		if(inDemo) synth->resetChannels(false);
+		in_demo = !in_demo;
+		if(in_demo) synth->reset_channels(false);
 	}
-	if((buttonsPushed&32) > 0 && (channelConfigState == 0))
+	if((buttons_pushed&32) > 0 && (channel_config_state == 0))
 	{
 		// MIDI
-		channelConfigState = 1;
-		synth->setChannelConfiguration(false, false);
-		synth->resetChannels(true);
+		channel_config_state = 1;
+		synth->set_channel_configuration(false, false);
+		synth->reset_channels(true);
 	}
-	if((buttonsPushed&8) > 0)
+	if((buttons_pushed&8) > 0)
 	{
 		// EXT
 		// Do nothing for now as rhythm not implemented
 	}
-	if((buttonsPushed&4) > 0 && (channelConfigState == 1 || channelConfigState == 3))
+	if((buttons_pushed&4) > 0 && (channel_config_state == 1 || channel_config_state == 3))
 	{
 		// CH4
-		synth->setChannelConfiguration(true, true);
-		synth->resetChannels(false);
-		channelConfigState = 4;
+		synth->set_channel_configuration(true, true);
+		synth->reset_channels(false);
+		channel_config_state = 4;
 	}
-	if((buttonsPushed&2) > 0 && channelConfigState == 1)
+	if((buttons_pushed&2) > 0 && channel_config_state == 1)
 	{
 		// CH3
-		synth->setChannelConfiguration(true, false);
-		synth->resetChannels(false);
-		channelConfigState = 3;
+		synth->set_channel_configuration(true, false);
+		synth->reset_channels(false);
+		channel_config_state = 3;
 	}
 }
 
-bool LoopySound::midiIn(char b)
+bool LoopySound::midi_in(char b)
 {
 	// temporarily ignore midi here when in demo or keyboard mode
-	if(inDemo || (channelConfigState == 0)) return true;
-	return enqueueMidiByte(b, timeReferenceSamples);
+	if(in_demo || (channel_config_state == 0)) return true;
+	return enqueue_midi_byte(b, time_reference_samples);
 }
 
-bool LoopySound::enqueueMidiByte(char midiByte, int timestamp)
+bool LoopySound::enqueue_midi_byte(char midi_byte, int timestamp)
 {
-	if((queueWrite + 1) % MIDI_QUEUE_CAPACITY == queueRead)
+	if((queue_write + 1) % MIDI_QUEUE_CAPACITY == queue_read)
 	{
-		if(!midiOverflowed) printf("[Sound] MIDI queue overflow, increase queue capacity or send smaller groups more often.\n");
-		midiOverflowed = true;
+		if(!midi_overflowed) printf("[Sound] MIDI queue overflow, increase queue capacity or send smaller groups more often.\n");
+		midi_overflowed = true;
 		return false;
 	}
-	midiOverflowed = false;
-	midiQueueBytes[queueWrite] = midiByte;
-	midiQueueTimestamps[queueWrite] = timestamp;
-	queueWrite = (queueWrite + 1) % MIDI_QUEUE_CAPACITY;
+	midi_overflowed = false;
+	midi_queue_bytes[queue_write] = midi_byte;
+	midi_queue_timestamps[queue_write] = timestamp;
+	queue_write = (queue_write + 1) % MIDI_QUEUE_CAPACITY;
 	return true;
 }
 
-void LoopySound::handleMidiEvent()
+void LoopySound::handle_midi_event()
 {
-	while(queueWrite != queueRead)
+	while(queue_write != queue_read)
 	{
-		int etime = midiQueueTimestamps[queueRead];
-		int timeDiff = (etime - outSampleCount); // wraparound taken care of here
-		if(hasTimeReference && timeDiff > 0) break;
-		char ebyte = midiQueueBytes[queueRead];
-		queueRead = (queueRead + 1) % MIDI_QUEUE_CAPACITY;
-		synth->processMidiNow(ebyte);
+		int event_time = midi_queue_timestamps[queue_read];
+		int time_diff = (event_time - out_sample_count); // wraparound taken care of here
+		if(has_time_reference && time_diff > 0) break;
+		char event_byte = midi_queue_bytes[queue_read];
+		queue_read = (queue_read + 1) % MIDI_QUEUE_CAPACITY;
+		synth->process_midi_now(event_byte);
 	}
 }
 
 BiquadStereoFilter::BiquadStereoFilter(float fs, float fc, float q, bool hp)
 {
 	reset();
-	setParameters(fs, fc, q, hp);
+	set_parameters(fs, fc, q, hp);
 }
 
-void BiquadStereoFilter::setFs(float fs)
+void BiquadStereoFilter::set_fs(float fs)
 {
 	this->fs = fs;
-	updateCoefficients();
+	update_coefficients();
 }
 
-void BiquadStereoFilter::setFc(float fc)
+void BiquadStereoFilter::set_fc(float fc)
 {
 	this->fc = fc;
-	updateCoefficients();
+	update_coefficients();
 }
 
-void BiquadStereoFilter::setQ(float q)
+void BiquadStereoFilter::set_q(float q)
 {
 	this->q = q;
-	updateCoefficients();
+	update_coefficients();
 }
 
-void BiquadStereoFilter::setHp(bool hp)
+void BiquadStereoFilter::set_hp(bool hp)
 {
 	this->hp = hp;
-	updateCoefficients();
+	update_coefficients();
 }
 
-void BiquadStereoFilter::setParameters(float fs, float fc, float q, bool hp)
+void BiquadStereoFilter::set_parameters(float fs, float fc, float q, bool hp)
 {
 	this->fs = fs;
 	this->fc = fc;
 	this->q = q;
 	this->hp = hp;
-	updateCoefficients();
+	update_coefficients();
 }
 
 void BiquadStereoFilter::reset()
@@ -874,7 +875,7 @@ void BiquadStereoFilter::process(float sample[])
 	}
 }
 
-void BiquadStereoFilter::updateCoefficients()
+void BiquadStereoFilter::update_coefficients()
 {
 	// Second order shared
 	constexpr static float PI = 3.14159265358979323846f;
