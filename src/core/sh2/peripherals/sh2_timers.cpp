@@ -285,11 +285,15 @@ void write8(uint32_t addr, uint8_t value)
 			update_timer_irq(timer);
 			break;
 		case 0x04:
-			printf("[Timer] write timer%d counter: %02X\n", timer->id, value);
-
+			printf("[Timer] write timer%d counter: %02X**\n", timer->id, value);
 			//The BIOS writes 0 to here under the assumption that it resets the whole counter...
-			assert(!value);
-			timer->counter = 0;
+			timer->counter &= 0x00FF;
+			timer->counter |= value << 8;
+			break;
+		case 0x05:
+			printf("[Timer] write timer%d counter: **%02X\n", timer->id, value);
+			timer->counter &= 0xFF00;
+			timer->counter |= value;
 			break;
 		default:
 			assert(0);
@@ -335,6 +339,9 @@ void write16(uint32_t addr, uint16_t value)
 	{
 		switch (reg)
 		{
+		case 0x04:
+			printf("[Timer] write timer%d counter: %04X\n", timer->id, value);
+			timer->counter = value;
 		case 0x06:
 		case 0x08:
 			reg = (reg - 0x06) >> 1;
