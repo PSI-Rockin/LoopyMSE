@@ -360,6 +360,7 @@ void write16(uint32_t addr, uint16_t value)
 			printf("[Timer] write timer%d counter: %04X\n", timer->id, value);
 			timer->counter = value;
 			update_timer_target(timer);
+			break;
 		case 0x06:
 		case 0x08:
 			reg = (reg - 0x06) >> 1;
