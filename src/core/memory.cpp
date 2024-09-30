@@ -1,3 +1,4 @@
+#include <cstring>
 #include <memory>
 #include "core/memory.h"
 

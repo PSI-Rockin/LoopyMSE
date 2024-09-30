@@ -17,6 +17,7 @@ Game support notes:
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 #include <memory>
 #include <vector>
