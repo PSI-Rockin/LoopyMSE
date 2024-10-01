@@ -126,6 +126,16 @@ static void update_timer_irq(Timer* timer)
 	}
 }
 
+static void update_timer_target(Timer* timer)
+{
+	// Disable and re-enable to force new timing to take effect
+	if (timer->enabled)
+	{
+		timer->set_enable(false);
+		timer->set_enable(true);
+	}
+}
+
 static void intr_event(uint64_t param, int cycles_late)
 {
 	assert(!cycles_late);
@@ -267,9 +277,11 @@ void write8(uint32_t addr, uint8_t value)
 		{
 		case 0x00:
 			printf("[Timer] write timer%d ctrl: %02X\n", timer->id, value);
+			timer->update_counter();
 			timer->ctrl.clock = value & 0x7;
 			timer->ctrl.edge_mode = (value >> 3) & 0x3;
 			timer->ctrl.clear_mode = (value >> 5) & 0x3;
+			update_timer_target(timer);
 			break;
 		case 0x01:
 			printf("[Timer] write timer%d io ctrl: %02X\n", timer->id, value);
@@ -278,6 +290,7 @@ void write8(uint32_t addr, uint8_t value)
 		case 0x02:
 			printf("[Timer] write timer%d intr enable: %02X\n", timer->id, value);
 			timer->intr_enable = value;
+			update_timer_irq(timer);
 			break;
 		case 0x03:
 			printf("[Timer] write timer%d intr flag: %02X\n", timer->id, value);
@@ -285,11 +298,19 @@ void write8(uint32_t addr, uint8_t value)
 			update_timer_irq(timer);
 			break;
 		case 0x04:
-			printf("[Timer] write timer%d counter: %02X\n", timer->id, value);
-
+			printf("[Timer] write timer%d counter: %02X**\n", timer->id, value);
 			//The BIOS writes 0 to here under the assumption that it resets the whole counter...
-			assert(!value);
-			timer->counter = 0;
+			timer->update_counter();
+			timer->counter &= 0x00FF;
+			timer->counter |= value << 8;
+			update_timer_target(timer);
+			break;
+		case 0x05:
+			printf("[Timer] write timer%d counter: **%02X\n", timer->id, value);
+			timer->update_counter();
+			timer->counter &= 0xFF00;
+			timer->counter |= value;
+			update_timer_target(timer);
 			break;
 		default:
 			assert(0);
@@ -335,11 +356,18 @@ void write16(uint32_t addr, uint16_t value)
 	{
 		switch (reg)
 		{
+		case 0x04:
+			printf("[Timer] write timer%d counter: %04X\n", timer->id, value);
+			timer->counter = value;
+			update_timer_target(timer);
+			break;
 		case 0x06:
 		case 0x08:
 			reg = (reg - 0x06) >> 1;
 			printf("[Timer] write timer%d general reg%d: %04X\n", timer->id, reg, value);
+			timer->update_counter();
 			timer->gen_reg[reg] = value;
+			update_timer_target(timer);
 			break;
 		default:
 			assert(0);

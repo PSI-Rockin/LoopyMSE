@@ -80,12 +80,48 @@ uint16_t read16(uint32_t addr)
 
 	switch (addr)
 	{
+	case 0x04:
+	{
+		// IPRA
+		uint16_t result = state.prios[(int)IRQ::IRQ0] << 12;
+		result |= state.prios[(int)IRQ::IRQ1] << 8;
+		result |= state.prios[(int)IRQ::IRQ2] << 4;
+		result |= state.prios[(int)IRQ::IRQ3];
+		return result;
+	}
+	case 0x06:
+	{
+		// IPRB
+		uint16_t result = state.prios[(int)IRQ::IRQ4] << 12;
+		result |= state.prios[(int)IRQ::IRQ5] << 8;
+		result |= state.prios[(int)IRQ::IRQ6] << 4;
+		result |= state.prios[(int)IRQ::IRQ7];
+		return result;
+	}
 	case 0x08:
 	{
-		uint16_t result = state.prios[(int)IRQ::ITU1];
-		result |= state.prios[(int)IRQ::ITU0] << 4;
+		// IPRC
+		uint16_t result =  state.prios[(int)IRQ::DMAC0] << 12;
 		result |= state.prios[(int)IRQ::DMAC2] << 8;
-		result |= state.prios[(int)IRQ::DMAC0] << 12;
+		result |= state.prios[(int)IRQ::ITU0] << 4;
+		result |= state.prios[(int)IRQ::ITU1];
+		return result;
+	}
+	case 0x0A:
+	{
+		// IPRD
+		uint16_t result = state.prios[(int)IRQ::ITU2] << 12;
+		result |= state.prios[(int)IRQ::ITU3] << 8;
+		result |= state.prios[(int)IRQ::ITU4] << 4;
+		result |= state.prios[(int)IRQ::SCI0];
+		return result;
+	}
+	case 0x0C:
+	{
+		// IPRE
+		uint16_t result = state.prios[(int)IRQ::SCI1] << 12;
+		result |= state.prios[(int)IRQ::PRT] << 8;
+		result |= state.prios[(int)IRQ::WDT] << 4;
 		return result;
 	}
 	default:
@@ -96,26 +132,18 @@ uint16_t read16(uint32_t addr)
 
 uint8_t read8(uint32_t addr)
 {
-	addr &= 0xF;
-
-	switch (addr)
+	uint8_t result;
+	if ((addr & 1) == 0)
 	{
-	case 0x08:
+		// Read the first (high) byte
+		result = read16(addr) >> 8;
+	}
+	else
 	{
-		uint8_t result = state.prios[(int)IRQ::DMAC2];
-		result |= state.prios[(int)IRQ::DMAC0] << 4;
-		return result;
+		// Read the second (low) byte
+		result = read16(addr - 1) & 0xFF;
 	}
-	case 0x09:
-	{
-		uint8_t result = state.prios[(int)IRQ::ITU1];
-		result |= state.prios[(int)IRQ::ITU0] << 4;
-		return result;
-	}
-	default:
-		assert(0);
-		return 0;
-	}
+	return result;
 }
 
 void write16(uint32_t addr, uint16_t value)
@@ -124,11 +152,39 @@ void write16(uint32_t addr, uint16_t value)
 
 	switch (addr)
 	{
+	case 0x04:
+		// IPRA
+		state.prios[(int)IRQ::IRQ0] = value >> 12;
+		state.prios[(int)IRQ::IRQ1] = (value >> 8) & 0x0F;
+		state.prios[(int)IRQ::IRQ2] = (value >> 4) & 0x0F;
+		state.prios[(int)IRQ::IRQ3] = value & 0x0F;
+		break;
+	case 0x06:
+		// IPRB
+		state.prios[(int)IRQ::IRQ4] = value >> 12;
+		state.prios[(int)IRQ::IRQ5] = (value >> 8) & 0x0F;
+		state.prios[(int)IRQ::IRQ6] = (value >> 4) & 0x0F;
+		state.prios[(int)IRQ::IRQ7] = value & 0x0F;
+		break;
 	case 0x08:
-		state.prios[(int)IRQ::ITU1] = value & 0x0F;
-		state.prios[(int)IRQ::ITU0] = (value >> 4) & 0x0F;
-		state.prios[(int)IRQ::DMAC2] = state.prios[(int)IRQ::DMAC3] = (value >> 8) & 0x0F;
+		// IPRC
 		state.prios[(int)IRQ::DMAC0] = state.prios[(int)IRQ::DMAC1] = value >> 12;
+		state.prios[(int)IRQ::DMAC2] = state.prios[(int)IRQ::DMAC3] = (value >> 8) & 0x0F;
+		state.prios[(int)IRQ::ITU0] = (value >> 4) & 0x0F;
+		state.prios[(int)IRQ::ITU1] = value & 0x0F;
+		break;
+	case 0x0A:
+		// IPRD
+		state.prios[(int)IRQ::ITU2] = value >> 12;
+		state.prios[(int)IRQ::ITU3] = (value >> 8) & 0x0F;
+		state.prios[(int)IRQ::ITU4] = (value >> 4) & 0x0F;
+		state.prios[(int)IRQ::SCI0] = value & 0x0F;
+		break;
+	case 0x0C:
+		// IPRE
+		state.prios[(int)IRQ::SCI1] = value >> 12;
+		state.prios[(int)IRQ::PRT] = (value >> 8) & 0x0F;
+		state.prios[(int)IRQ::WDT] = state.prios[(int)IRQ::REF] = (value >> 4) & 0x0F;
 		break;
 	default:
 		assert(0);
@@ -137,20 +193,20 @@ void write16(uint32_t addr, uint16_t value)
 
 void write8(uint32_t addr, uint8_t value)
 {
-	addr &= 0xF;
-
-	switch (addr)
+	uint16_t tmp;
+	if ((addr & 1) == 0)
 	{
-	case 0x08:
-		state.prios[(int)IRQ::DMAC2] = state.prios[(int)IRQ::DMAC3] = value & 0x0F;
-		state.prios[(int)IRQ::DMAC0] = state.prios[(int)IRQ::DMAC1] = value >> 4;
-		break;
-	case 0x09:
-		state.prios[(int)IRQ::ITU1] = value & 0x0F;
-		state.prios[(int)IRQ::ITU0] = value >> 4;
-		break;
-	default:
-		assert(0);
+		// Write the first (high) byte by masking
+		tmp = read16(addr) & 0x00FF;
+		tmp |= value << 8;
+		write16(addr, tmp);
+	}
+	else
+	{
+		// Write the second (low) byte by masking
+		tmp = read16(addr - 1) & 0xFF00;
+		tmp |= value;
+		write16(addr - 1, tmp);
 	}
 }
 
