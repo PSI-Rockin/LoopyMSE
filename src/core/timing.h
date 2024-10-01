@@ -1,6 +1,8 @@
 #pragma once
 #include <functional>
 #include <string>
+#include <limits>
+#include <cstdint>
 
 namespace Timing
 {
